@@ -83,7 +83,7 @@ Misafir listesi tarayıcıda `anime-takvimi-mal-v1` anahtarında tutulur. Giriş
 
 ## D1 ve migration kurulumu
 
-`.openai/hosting.json` D1 bağlantısını `DB` adıyla tanımlar. Şema `db/schema.ts` içindedir; üyeler, yönetici sahipliği, kişisel listeler ve admin işlem kayıtlarını kapsar. Üretimde bu bağlantı gerçekten oluşturulmalı ve Worker ortamında erişilebilir olmalıdır.
+`vite.config.ts` Worker bağlantılarını doğrudan tanımlar: D1 veritabanı `DB`, profil fotoğraflarının R2 alanı `BUCKET` adıyla kullanılır. Ayrı bir hosting manifesti gerekmez. Şema `db/schema.ts` içindedir; üyeler, yönetici sahipliği, kişisel listeler ve admin işlem kayıtlarını kapsar. Üretimde bu kaynaklar gerçekten oluşturulmalı ve Worker ortamına bağlanmalıdır. Bu yapılandırma, Sites'in sağladığı ChatGPT giriş altyapısının yerini almaz.
 
 İlk SQL migration pakette hazırdır: `drizzle/0000_worried_anita_blake.sql`. Şemayı değiştirdiğinde yeni migration üret:
 
@@ -130,11 +130,11 @@ Sites eklentisiyle çalışırken onun kurulum, önizleme, build ve yayımlama a
 ## Üretime çıkış için tamamlanacaklar
 
 1. Bağımlılıklar kurulmalı; üyelik testleri ve production build başarılı olmalı.
-2. Sites projesinde `DB` D1 ve `BUCKET` R2 bağlantıları oluşturulmalı; `0000` ve `0001` dahil bütün bekleyen SQL migrationları sırayla uygulanmalı. Sites bu bağlantıları hosting manifestine göre sağlar.
+2. Sites projesinde `DB` D1 ve `BUCKET` R2 bağlantıları, `vite.config.ts` içindeki adlarla oluşturulup Worker ortamına bağlanmalı; `0000` ve `0001` dahil bütün bekleyen SQL migrationları sırayla uygulanmalı.
 3. `ADMIN_EMAIL` Sites RuntimeEnv içinde sunucu sırrı olarak ayarlanmalı.
 4. ChatGPT kimliğini doğrulayan Sites giriş altyapısı etkin olmalı. Uygulamanın kullandığı kimlik üstbilgilerini platform sağlamalı.
 5. Projenin mevcut **private** erişim politikası korunmalı. Uygulama üyeliği, Sites'in ziyaretçi erişim izninden ayrıdır. Daha geniş bir kullanıcı kitlesi için Sites audience/erişim ayarı ayrıca düzenlenmelidir; üyelik formunun bulunması siteyi herkese açmaz.
-6. Kaynak aktarımı ve Sites yayımlama işlemi tamamlanmalı. Gerçek oturumla üyelik, yönetici sahipliği, liste kaydı, askıya alma ve çıkış akışları yayında doğrulanmalı.
+6. Kaynak aktarımı ve Sites yayımlama işlemi tamamlanmalı; GitHub'a kaynak göndermek siteyi canlı yayına almaz. Gerçek oturumla üyelik, yönetici sahipliği, liste kaydı, askıya alma ve çıkış akışları yayında doğrulanmalı.
 
 ## Dosya düzeni
 
