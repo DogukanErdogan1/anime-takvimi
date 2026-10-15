@@ -41,9 +41,9 @@
     } catch (_) { /* Use a normal native sign-in anchor instead. */ }
     return fallback;
   }
-  function signInUrl() { return safePath(state.account?.signInUrl, '/signin-with-chatgpt?return_to=%2F'); }
-  function registerUrl() { return safePath(state.account?.registerUrl, '/signin-with-chatgpt?return_to=%2F%3Fjoin%3D1'); }
-  function signOutUrl() { return safePath(state.account?.signOutUrl, '/signout-with-chatgpt?return_to=%2F'); }
+  function signInUrl() { return safePath(state.account?.signInUrl, '/giris'); }
+  function registerUrl() { return safePath(state.account?.registerUrl, '/uye-ol'); }
+  function signOutUrl() { return safePath(state.account?.signOutUrl, '/cikis'); }
   function filePreview() { return window.location.protocol === 'file:'; }
   function identity() { return registered() ? state.account.user : state.account?.identity || {}; }
   function initials(person = identity()) {
@@ -234,30 +234,8 @@
 
   function openRegistration() {
     if (filePreview()) { openSetup(); return; }
-    if (!state.account?.authenticated) { setNotice('Üyelik için önce ChatGPT hesabınla giriş yapabilirsin.'); return; }
     if (registered()) { openProfile(); return; }
-    const identity = state.account.identity || {};
-    const email = String(identity.email || '');
-    const displayName = String(identity.displayName || '').slice(0, 40);
-    openDialog(`<section class="membership-profile"><span class="dialog-kicker">Doğrulanmış ChatGPT hesabı</span><h2 id="membership-title" class="dialog-title">Üyeliğini tamamla</h2><p class="dialog-summary">E-posta adresin giriş yaptığın hesaptan alınır. Kişisel listen hesabına bağlı tutulur; bu cihazdaki misafir listen ayrı kalır.</p><form id="registration-form" class="membership-form"><label for="registration-email">Doğrulanmış e-posta</label><input id="registration-email" type="email" value="${escape(email)}" readonly aria-readonly="true"><label for="registration-name">Görünen adın</label><input id="registration-name" name="displayName" type="text" value="${escape(displayName)}" minlength="2" maxlength="40" required autocomplete="nickname"><p class="form-hint">2–40 karakter. E-posta ve yetki bilgisi bu formdan değiştirilemez.</p><p id="registration-error" class="form-error" role="alert"></p><button type="submit" class="primary-button"${email ? '' : ' disabled'}>${icon('user')} Üyeliği oluştur</button></form>${email ? '' : '<p class="form-error">Doğrulanmış e-posta bilgisi alınamadı. Yeniden giriş yapabilirsin.</p>'}</section>`);
-    $('#registration-form')?.addEventListener('submit', register);
-  }
-
-  async function register(event) {
-    event.preventDefault();
-    const name = $('#registration-name')?.value.trim() || '';
-    const errorEl = $('#registration-error');
-    if (name.length < 2 || name.length > 40) { if (errorEl) errorEl.textContent = 'Görünen adın 2–40 karakter olmalı.'; return; }
-    const button = event.currentTarget.querySelector('button[type="submit"]'); if (button) button.disabled = true;
-    if (errorEl) errorEl.textContent = '';
-    try {
-      await api('/api/account/register', { method: 'POST', body: JSON.stringify({ displayName: name }) });
-      closeDialog(); await loadAccount();
-      if (registered()) openProfile();
-    } catch (error) {
-      expireSession(error);
-      if (errorEl) errorEl.textContent = errorText(error);
-    } finally { if (button) button.disabled = false; }
+    window.location.assign(registerUrl());
   }
 
   function stats() {
@@ -313,7 +291,7 @@
   function openSettings() {
     if (!registered()) return;
     const user = state.account.user;
-    openDialog(`<section class="membership-profile"><span class="dialog-kicker">Hesap bilgilerin</span><h2 id="membership-title" class="dialog-title">Hesap ayarları</h2><dl class="dialog-facts"><div><dt>Görünen ad</dt><dd>${escape(user.displayName)}</dd></div><div><dt>Doğrulanmış e-posta</dt><dd>${escape(user.email)}</dd></div><div><dt>Üyelik durumu</dt><dd>${state.blocked || user.status === 'suspended' ? 'Askıya alınmış' : 'Aktif'}</dd></div></dl><p class="dialog-summary">Kimliğin ChatGPT girişiyle doğrulanır. E-posta ve üyelik yetkisi tarayıcıdan değiştirilemez. Misafir listesi ve hesap listesi ayrı tutulur.</p><p class="dialog-note">${escape(state.notice)}</p><div class="dialog-actions"><button type="button" class="primary-button" data-member-action="retry-library"${activeMember() ? '' : ' disabled'}>Hesap listesini yeniden eşitle</button><button type="button" class="outline-button" data-member-action="profile">Profile dön</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a></div></section>`);
+    openDialog(`<section class="membership-profile"><span class="dialog-kicker">Hesap bilgilerin</span><h2 id="membership-title" class="dialog-title">Hesap ayarları</h2><dl class="dialog-facts"><div><dt>Görünen ad</dt><dd>${escape(user.displayName)}</dd></div><div><dt>E-posta adresi</dt><dd>${escape(user.email)}</dd></div><div><dt>Hesap kimliği</dt><dd><input class="account-id-field" aria-label="Hesap kimliği" readonly value="${escape(user.id)}"></dd></div><div><dt>Üyelik durumu</dt><dd>${state.blocked || user.status === 'suspended' ? 'Askıya alınmış' : 'Aktif'}</dd></div></dl><p class="dialog-summary">E-posta ve şifrenle giriş yaparsın. Üyelik yetkisi sunucuda kontrol edilir. Misafir listesi ve hesap listesi ayrı tutulur.</p><p class="dialog-note">${escape(state.notice)}</p><div class="dialog-actions"><button type="button" class="primary-button" data-member-action="retry-library"${activeMember() ? '' : ' disabled'}>Hesap listesini yeniden eşitle</button><button type="button" class="outline-button" data-member-action="profile">Profile dön</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a></div></section>`);
   }
 
   function enforceAdminLayout() {
@@ -335,7 +313,37 @@
   }
   function openAdmin() {
     if (!admin()) { setNotice('Üye yönetimi için yönetici yetkisi gerekiyor.', 'error'); return; }
-    state.adminOpen = true; enforceAdminLayout(); loadMembers(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    state.adminOpen = true; enforceAdminLayout(); renderBannerEditor(); loadMembers(); window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderBannerEditor() {
+    const panel = $('#admin-panel');
+    if (!panel || !admin()) return;
+    let editor = $('#banner-editor');
+    if (!editor) {
+      editor = document.createElement('section'); editor.id = 'banner-editor'; editor.className = 'banner-editor';
+      panel.append(editor);
+      editor.innerHTML = '<h2>Anime banner görseli</h2><p>Yatay görseller AniList üzerinden otomatik bulunur. İstediğin anime için kendi görselini yükleyebilirsin. Öneri: 1920 × 720 piksel · PNG, JPEG veya WebP · En fazla 2 MiB.</p><form id="banner-form"><label>MyAnimeList anime numarası<input id="banner-mal-id" type="number" min="1" max="2147483647" step="1" placeholder="Örn. 52991" required></label><label>Yatay görsel<input id="banner-file" type="file" accept="image/png,image/jpeg,image/webp"></label><button type="submit" class="primary-button">Görseli kaydet</button><button type="button" class="outline-button" id="banner-reset">Otomatik görsele dön</button></form><p id="banner-result" role="status" aria-live="polite"></p>';
+      $('#banner-form').addEventListener('submit', event => { event.preventDefault(); updateBanner(false); });
+      $('#banner-reset').addEventListener('click', () => updateBanner(true));
+    }
+  }
+  async function updateBanner(reset) {
+    if (!admin()) return;
+    const input = $('#banner-mal-id'), fileInput = $('#banner-file'), form = $('#banner-form'), result = $('#banner-result');
+    if (!input.reportValidity()) return;
+    const id = Number(input.value), file = fileInput.files?.[0];
+    result.className = '';
+    if (!reset && !file) { result.textContent = 'Önce yatay bir görsel seç.'; return; }
+    if (!window.AnimeBanners) { result.textContent = 'Görsel hizmeti yüklenemedi. Sayfayı yenileyebilirsin.'; return; }
+    form.querySelectorAll('button,input').forEach(control => control.disabled = true);
+    result.textContent = reset ? 'Otomatik görsele dönülüyor…' : 'Görsel yükleniyor…';
+    try {
+      if (reset) await window.AnimeBanners.remove(id); else await window.AnimeBanners.upload(id,file);
+      result.textContent = reset ? 'Bu anime için otomatik yatay görsel kullanılacak.' : 'Banner kaydedildi. Bu anime öne çıktığında yeni görseli görünecek.';
+      fileInput.value = '';
+    } catch (error) { result.className = 'form-error'; result.textContent = error.message || 'Görsel kaydedilemedi. Yeniden dene.'; }
+    finally { form.querySelectorAll('button,input').forEach(control => control.disabled = false); }
   }
 
   function renderAdmin() {

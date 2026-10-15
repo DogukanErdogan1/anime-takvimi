@@ -10,14 +10,16 @@
   <link rel="stylesheet" href="styles.css">
   <script src="icons.js" defer></script>
   <script src="data-provider.js" defer></script>
+  <script src="hero-banners.js" defer></script>
   <script src="app.js" defer></script>
   <script src="membership.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">İçeriğe geç</a>
-  <aside class="rail" aria-label="Ana gezinti">
-    <a class="rail-brand" href="#discover" aria-label="Anime Takvimi ana sayfa"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">ANİME<br>TAKVİMİ</span></a>
-    <nav id="nav-items" class="nav-items">
+  <div class="site-masthead">
+    <header class="rail" aria-label="Ana gezinti">
+    <a class="rail-brand" href="#discover" aria-label="Anime Takvimi ana sayfa"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">Anime Takvimi</span></a>
+    <nav id="nav-items" class="nav-items" aria-label="Ana menü">
       <button id="admin-nav" class="nav-item" hidden><span data-icon="settings"></span><span>Admin Paneli</span></button>
       <button class="nav-item active" data-page="discover" aria-current="page"><span data-icon="compass"></span><span>Keşfet</span></button>
       <button class="nav-item" data-page="seasons"><span data-icon="calendar"></span><span>Sezonlar</span></button>
@@ -25,41 +27,38 @@
       <button class="nav-item" data-page="watchlist"><span data-icon="bookmark"></span><span>Listem</span><span id="watchlist-count" class="nav-count"></span></button>
     </nav>
     <div class="rail-season"><span class="season-rule" aria-hidden="true"></span><span id="rail-year" class="rail-year">2026</span><strong id="rail-season-title">Sonbahar</strong><p>Yeni hikâyeler<br>seni bekliyor.</p></div>
-    <button class="profile-button" id="profile-button" type="button" hidden aria-label="Profilim"><span class="avatar profile-avatar" aria-hidden="true"></span><span>Profilim</span><span data-icon="chevron-right"></span></button>
-  </aside>
-  <div class="workspace">
-    <main id="main" class="main-panel">
-      <div class="account-toolbar"><div id="account-actions" class="account-actions"></div></div>
-      <div id="account-status" class="account-status" role="status" aria-live="polite"></div>
-      <header class="page-header">
-        <div class="heading-block"><div class="eyebrow"><span data-icon="chevron-left"></span> SEZON REHBERİ</div><h1 id="page-title">Sonbahar 2026</h1><p id="page-subtitle">Yeni hikâyeler, yeni favoriler.</p></div>
-        <div class="header-controls"><label class="search-field"><span data-icon="search"></span><input id="search" type="search" placeholder="Anime ara..." autocomplete="off" aria-label="Anime ara"></label><div class="season-picker"><button id="season-prev" class="icon-button" aria-label="Önceki sezon"><span data-icon="chevron-left"></span></button><span id="season-label">Sonbahar 2026</span><button id="season-next" class="icon-button" aria-label="Sonraki sezon"><span data-icon="chevron-right"></span></button></div></div>
-      </header>
-      <div id="format-tabs" class="format-tabs" role="group" aria-label="Anime formatı"><button class="active" data-format="TV" aria-pressed="true">TV</button><button data-format="Film" aria-pressed="false">Filmler</button><button data-format="OVA" aria-pressed="false">OVA</button><button data-format="all" aria-pressed="false">Tümü</button></div>
-      <div id="season-notice" class="season-notice" hidden></div>
-      <div class="data-toolbar"><div id="data-status" class="data-status" role="status" aria-live="polite">MyAnimeList kataloğu yükleniyor…</div><button id="refresh-data" class="text-button" title="Anime verilerini yeniden yükle"><span data-icon="clock"></span>Yenile</button></div>
-      <section id="hero" class="hero" aria-label="Sezonun öne çıkan animesi" hidden>
+    <div class="nav-account"><a class="nav-search" href="#search" aria-label="Anime ara"><span data-icon="search"></span></a><button class="profile-button" id="profile-button" type="button" hidden aria-label="Profilim"><span class="avatar profile-avatar" aria-hidden="true"></span><span>Profilim</span><span data-icon="chevron-right"></span></button><div class="account-toolbar"><div id="account-actions" class="account-actions"></div></div></div>
+  </header>
+    <header class="page-header">
+      <div class="heading-block"><div class="eyebrow">SEZON REHBERİ</div><h1 id="page-title">Sonbahar 2026</h1><p id="page-subtitle">Yeni hikâyeler, yeni favoriler.</p></div>
+      <div class="masthead-actions"><a class="primary-button" href="#catalog-section">Sezonu keşfet</a><button type="button" class="masthead-schedule" data-page="schedule">Yayın takvimi<span data-icon="arrow-right"></span></button></div>
+    </header>
+    <section id="hero" class="hero" aria-label="Sezonun öne çıkan animesi" hidden>
         <div class="hero-content"><div class="hero-kicker">SEZONUN ÖNE ÇIKANI</div><h2 id="hero-title"></h2><p id="hero-description"></p><div id="hero-genres" class="hero-genres"></div><div class="hero-actions"><button id="hero-save" class="primary-button"><span data-icon="plus"></span>Listeme ekle</button><button id="hero-detail" class="hero-detail"><span class="hero-detail-icon" data-icon="arrow-right"></span>Detayları gör</button></div></div>
         <div id="hero-pagination" class="hero-pagination"></div>
       </section>
+  </div>
+  <div class="workspace">
+    <main id="main" class="main-panel" tabindex="-1">
+      <section id="schedule-aside" class="schedule-aside" aria-label="Haftalık yayın özeti"><section class="today-panel"><h2>Haftalık yayın</h2><div class="schedule-date-row"><span id="schedule-date"></span><small>Türkiye saati</small></div><div id="weekday-tabs" class="weekday-tabs" role="group" aria-label="Yayın günü"></div><div id="schedule-list" class="schedule-list"></div><p class="broadcast-note">Kaynağın haftalık programı. Bölüm gecikmeleri ve platform saatleri farklı olabilir.</p></section><button type="button" class="schedule-all text-button" data-page="schedule">Tüm takvim<span data-icon="arrow-right"></span></button></section>
+      <div id="account-status" class="account-status" role="status" aria-live="polite"></div>
       <section id="catalog-section" class="catalog" aria-labelledby="section-title">
-        <div class="catalog-heading"><div><h2 id="section-title">Sezonu keşfet</h2><span id="results-count" class="results-count"></span></div><div id="catalog-controls" class="catalog-controls"><label class="select-wrap"><span>Tür:</span><select id="genre" aria-label="Anime türü"><option value="all">Tümü</option><option>Aksiyon</option><option>Fantastik</option><option>Macera</option><option>Dram</option><option>Romantik</option><option>Gizem</option><option>Bilim Kurgu</option></select></label><label class="select-wrap sort-select"><span data-icon="filter"></span><select id="sort" aria-label="Sıralama"><option value="popular">Popülerlik</option><option value="rating">Puan</option><option value="title">İsim</option></select></label><div id="view-toggle" class="view-toggle" role="group" aria-label="Görünüm"><button class="active icon-button" data-view="grid" aria-label="Kart görünümü" aria-pressed="true"><span data-icon="grid"></span></button><button class="icon-button" data-view="list" aria-label="Liste görünümü" aria-pressed="false"><span data-icon="list"></span></button></div></div></div>
+        <div class="catalog-heading"><div class="catalog-title"><h2 id="section-title">Sezonu keşfet</h2><span id="results-count" class="results-count"></span></div><div class="header-controls"><label class="search-field"><span data-icon="search"></span><input id="search" type="search" placeholder="Anime ara..." autocomplete="off" aria-label="Anime ara"></label><label class="select-wrap sort-select"><span data-icon="filter"></span><select id="sort" aria-label="Sıralama"><option value="popular">Popülerlik</option><option value="rating">Puan</option><option value="title">İsim</option></select></label></div></div>
+        <div class="catalog-filterbar"><div id="format-tabs" class="format-tabs" role="group" aria-label="Anime formatı"><button data-format="all" aria-pressed="false">Tümü</button><button class="active" data-format="TV" aria-pressed="true">TV</button><button data-format="Film" aria-pressed="false">Filmler</button><button data-format="OVA" aria-pressed="false">OVA</button></div><div id="catalog-controls" class="catalog-controls"><label class="select-wrap"><span>Tür:</span><select id="genre" aria-label="Anime türü"><option value="all">Tümü</option><option>Aksiyon</option><option>Fantastik</option><option>Macera</option><option>Dram</option><option>Romantik</option><option>Gizem</option><option>Bilim Kurgu</option></select></label><div class="season-picker"><button id="season-prev" class="icon-button" aria-label="Önceki sezon"><span data-icon="chevron-left"></span></button><span id="season-label">Sonbahar 2026</span><button id="season-next" class="icon-button" aria-label="Sonraki sezon"><span data-icon="chevron-right"></span></button></div><div id="view-toggle" class="view-toggle" role="group" aria-label="Görünüm"><button class="active icon-button" data-view="grid" aria-label="Kart görünümü" aria-pressed="true"><span data-icon="grid"></span></button><button class="icon-button" data-view="list" aria-label="Liste görünümü" aria-pressed="false"><span data-icon="list"></span></button></div></div></div>
+        <div id="season-notice" class="season-notice" hidden></div>
+        <div class="data-toolbar"><div id="data-status" class="data-status" role="status" aria-live="polite">MyAnimeList kataloğu yükleniyor…</div><button id="refresh-data" class="text-button" title="Anime verilerini yeniden yükle"><span data-icon="clock"></span>Yenile</button></div>
         <div id="card-grid" class="catalog-grid"></div>
         <div id="empty-state" class="empty-state" hidden></div>
         <button id="load-more" class="load-more" hidden>Daha fazla keşfet<span data-icon="chevron-right"></span></button>
       </section>
       <section id="admin-panel" class="admin-panel" aria-label="Üye yönetimi" hidden><div id="admin-summary" class="admin-summary"></div><div class="admin-toolbar"><label class="search-field"><span data-icon="search"></span><input id="admin-search" type="search" placeholder="Üye ara…" aria-label="Üyelerde isim veya e-posta ara" autocomplete="off"></label><span class="admin-toolbar-note">Hesapların erişimini yönet</span></div><div id="admin-members" aria-live="polite"></div><div id="admin-pagination" class="admin-pagination"></div></section>
+      <section class="library-overview" aria-label="Kişisel takip özeti"><section class="follow-panel"><div class="aside-heading"><h2>Takip ettiklerim</h2><button data-page="watchlist" class="text-button">Tümünü gör<span data-icon="arrow-right"></span></button></div><div id="follow-list" class="follow-list"></div></section><button data-page="seasons" class="new-season"><span class="season-callout-icon" data-icon="calendar"></span><span><strong>Sezonları keşfet</strong><small>Keşif listeni oluştur.</small></span><span data-icon="chevron-right"></span></button></section>
       <section id="promo-banner" class="promo-banner"><span class="promo-icon" data-icon="bookmark"></span><div><h2>Sıradaki favorini bul</h2><p>Sevdiklerini kaydet, yeni bölümleri takip et.</p></div><button data-page="watchlist" class="outline-button">Listeme git<span data-icon="arrow-right"></span></button></section>
       <footer class="site-footer"><span>Veri: <a href="https://myanimelist.net/" target="_blank" rel="noopener noreferrer">MyAnimeList</a> · <a href="https://api.tenrai.org/documentation" target="_blank" rel="noopener noreferrer">Tenrai</a></span><span>Üyeler listelerini hesaplarına kaydedebilir.</span></footer>
     </main>
-    <aside id="schedule-aside" class="schedule-aside" aria-label="Yayın ve takip özeti">
-      <section class="today-panel"><h2>Haftalık yayın</h2><div class="schedule-date-row"><span id="schedule-date"></span><small>Türkiye saati</small></div><div id="weekday-tabs" class="weekday-tabs" role="group" aria-label="Yayın günü"></div><div id="schedule-list" class="schedule-list"></div><p class="broadcast-note">Kaynağın haftalık programı. Bölüm gecikmeleri ve platform saatleri farklı olabilir.</p></section>
-      <section class="follow-panel"><div class="aside-heading"><h2>Takip ettiklerim</h2><button data-page="watchlist" class="text-button">Tümünü gör<span data-icon="arrow-right"></span></button></div><div id="follow-list" class="follow-list"></div></section>
-      <button data-page="seasons" class="new-season"><span class="season-callout-icon" data-icon="calendar"></span><span><strong>Sezonları keşfet</strong><small>Keşif listeni oluştur.</small></span><span data-icon="chevron-right"></span></button>
-    </aside>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="anime-dialog" class="anime-dialog" aria-labelledby="dialog-title"><button id="dialog-close" class="dialog-close icon-button" aria-label="Pencereyi kapat"><span data-icon="close"></span></button><div id="dialog-content"></div></dialog>
-<dialog id="membership-dialog" class="membership-dialog" aria-labelledby="membership-title"><button id="membership-close" class="dialog-close icon-button" aria-label="Hesap penceresini kapat"><span data-icon="close"></span></button><div id="membership-content"></div></dialog>
+  <dialog id="membership-dialog" class="membership-dialog" aria-labelledby="membership-title"><button id="membership-close" class="dialog-close icon-button" aria-label="Hesap penceresini kapat"><span data-icon="close"></span></button><div id="membership-content"></div></dialog>
 </body>
 </html>

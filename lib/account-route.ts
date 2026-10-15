@@ -13,10 +13,10 @@ export async function membershipContext() {
   const identity = await getChatGPTUser();
   if (!identity) throw new MembershipError(401, 'sign_in_required', 'Önce giriş yapın.');
   if (!env.DB) throw new MembershipError(503, 'service_unavailable', 'Hesap hizmeti şu anda kullanılamıyor.');
-  return {identity, service: createMembershipService(env.DB, {adminEmail: env.ADMIN_EMAIL})};
+  return {identity, service: createMembershipService(env.DB)};
 }
 export function accountLinks<T extends {authenticated: boolean}>(account: T) {
-  return account.authenticated ? {...account, signOutUrl: chatGPTSignOutPath('/')} : {...account, signInUrl: chatGPTSignInPath('/'), registerUrl: chatGPTSignInPath('/?join=1')};
+  return account.authenticated ? {...account, signOutUrl: chatGPTSignOutPath('/')} : {...account, signInUrl: chatGPTSignInPath('/'), registerUrl: '/uye-ol'};
 }
 export async function accountResponse() {
   const identity = await getChatGPTUser();

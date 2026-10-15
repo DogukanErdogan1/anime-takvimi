@@ -2,7 +2,7 @@
   if (window.__animeSiteBooted) return;
   window.__animeSiteBooted = true;
   (async () => {
-    for (const name of ['icons.js','data-provider.js','app.js','membership.js']) {
+    for (const name of ['icons.js','data-provider.js','hero-banners.js','app.js','membership.js']) {
       await new Promise((resolve,reject) => {
         const script = document.createElement('script');
         script.src = '/site/' + name;

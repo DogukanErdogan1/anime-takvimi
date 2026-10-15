@@ -1,90 +1,22 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect } from 'next/navigation';
+import { currentAuthUser } from '@/lib/auth-route';
 
-export type ChatGPTUser = {
-  userId: string;
-  displayName: string;
-  email: string;
-  fullName: string | null;
-};
-
-const USER_ID_HEADER = "oai-authenticated-user-id";
-const USER_EMAIL_HEADER = "oai-authenticated-user-email";
-const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
-const USER_FULL_NAME_ENCODING_HEADER =
-  "oai-authenticated-user-full-name-encoding";
-const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
-const SIGN_IN_PATH = "/signin-with-chatgpt";
-const SIGN_OUT_PATH = "/signout-with-chatgpt";
-const CALLBACK_PATH = "/callback";
-
-export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get(USER_ID_HEADER);
-  const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (!userId || !email) return null;
-
-  const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
-      ? safeDecodeURIComponent(encodedFullName)
-      : null;
-
-  return {
-    userId,
-    displayName: fullName ?? email,
-    email,
-    fullName,
-  };
-}
-
-export async function requireChatGPTUser(
-  returnTo: string,
-): Promise<ChatGPTUser> {
-  const user = await getChatGPTUser();
+// Existing routes use these compatibility exports. Identity comes exclusively
+// from the server-verified session, never caller-supplied platform headers.
+export type ChatGPTUser = { userId: string; displayName: string; email: string; fullName: string | null };
+export const getChatGPTUser = currentAuthUser;
+export async function requireChatGPTUser(returnTo: string): Promise<ChatGPTUser> {
+  const user = await currentAuthUser();
   if (user) return user;
-
   redirect(chatGPTSignInPath(returnTo));
 }
-
-export function chatGPTSignInPath(returnTo: string): string {
-  const safeReturnTo = safeRelativeReturnPath(returnTo);
-  return `${SIGN_IN_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
-}
-
-export function chatGPTSignOutPath(returnTo = "/"): string {
-  const safeReturnTo = safeRelativeReturnPath(returnTo);
-  return `${SIGN_OUT_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
-}
-
-function safeRelativeReturnPath(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-
-  let url: URL;
+export function safeReturnPath(value = '/'): string {
+  if (!value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u001f]/.test(value)) return '/';
   try {
-    url = new URL(value, "https://app.local");
-  } catch {
-    return "/";
-  }
-  if (url.origin !== "https://app.local") return "/";
-  if (isReservedAuthPath(url.pathname)) return "/";
-
-  return `${url.pathname}${url.search}${url.hash}`;
+    const url = new URL(value, 'https://app.local');
+    if (url.origin !== 'https://app.local' || ['/giris','/uye-ol','/cikis'].includes(url.pathname)) return '/';
+    return url.pathname + url.search + url.hash;
+  } catch { return '/'; }
 }
-
-function isReservedAuthPath(pathname: string): boolean {
-  return (
-    pathname === SIGN_IN_PATH ||
-    pathname === SIGN_OUT_PATH ||
-    pathname === CALLBACK_PATH
-  );
-}
-
-function safeDecodeURIComponent(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
+export const chatGPTSignInPath = (returnTo = '/') => `/giris?return_to=${encodeURIComponent(safeReturnPath(returnTo))}`;
+export const chatGPTSignOutPath = (returnTo = '/') => `/cikis?return_to=${encodeURIComponent(safeReturnPath(returnTo))}`;

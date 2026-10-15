@@ -15,7 +15,7 @@
   const byId = new Map();
   const state = {
     page: 'discover', format: 'TV', genre: 'all', sort: 'popular', query: '',
-    view: 'grid', limit: 3, hero: 0, quarter: 3, year: 2026,
+    view: 'grid', limit: 5, hero: 0, quarter: 3, year: 2026,
     saved: new Set(), reminders: new Set(), progress: {}, dialogId: null,
     catalog: [], catalogKey: null, catalogMeta: null, catalogLoading: false, catalogError: null, catalogProgress: '',
     schedule: [], scheduleMeta: null, scheduleLoading: false, scheduleError: null,
@@ -27,6 +27,7 @@
   let scheduleController;
   let storageAvailable = true;
   let toastTimer;
+  let heroImageRequest = 0;
 
   function safeImage(value) {
     if (typeof window.AnimeData?.safeImage === 'function') return window.AnimeData.safeImage(value);
@@ -273,7 +274,7 @@
       grid.innerHTML = shown.map(item => card(item, personal)).join('');
       if (more && !personal && filtered.length > shown.length) {
         more.hidden = false;
-        more.innerHTML = `${icon('plus')} Daha fazla anime göster <span>(${Math.min(6, filtered.length - shown.length)})</span>`;
+        more.innerHTML = `${icon('plus')} Daha fazla anime göster <span>(${Math.min(5, filtered.length - shown.length)})</span>`;
       }
     }
     renderEmpty(count, loading, error);
@@ -301,6 +302,7 @@
   function heroItems() { return [...state.catalog].sort((a, b) => b.members - a.members).slice(0, 3); }
   function currentHero() { const entries = heroItems(); return entries[state.hero % Math.max(1, entries.length)] || null; }
   function renderHero() {
+    const imageRequest = ++heroImageRequest;
     const hero = $('#hero');
     if (!hero) return;
     const entries = heroItems();
@@ -313,6 +315,21 @@
     let image = $('.hero-poster');
     if (!image) { image = document.createElement('div'); image.className = 'hero-poster'; hero.prepend(image); }
     image.innerHTML = poster(item, { eager: true });
+    image.dataset.source = 'poster';
+    // Landscape art is separate from saved MAL metadata and catalog posters.
+    if (!hero.hidden && window.AnimeBanners) {
+      window.AnimeBanners.resolve(item.malId).then(value => {
+        const banner = window.AnimeBanners.safeBanner(value,item.malId);
+        if (!banner || imageRequest !== heroImageRequest || hero.hidden || hero.dataset.hero !== item.id) return;
+        const landscape = new Image();
+        landscape.alt = ''; landscape.decoding = 'async'; landscape.referrerPolicy = 'no-referrer';
+        landscape.onload = () => {
+          if (imageRequest !== heroImageRequest || hero.hidden || hero.dataset.hero !== item.id) return;
+          image.replaceChildren(landscape); image.dataset.source = 'landscape';
+        };
+        landscape.src = banner;
+      }).catch(() => { /* The existing poster remains visible. */ });
+    }
     if ($('.hero-kicker')) $('.hero-kicker').textContent = 'SEZONUN ÖNE ÇIKANI';
     if ($('#hero-title')) $('#hero-title').textContent = item.title;
     if ($('#hero-description')) $('#hero-description').textContent = `${item.format} · ${totalText(item)} · ${item.studio}`;
@@ -486,7 +503,7 @@
 
   function changePage(page) {
     if (!['discover', 'seasons', 'schedule', 'watchlist'].includes(page)) return;
-    state.page = page; state.query = ''; state.genre = 'all'; state.limit = 3;
+    state.page = page; state.query = ''; state.genre = 'all'; state.limit = 5;
     if ($('#search')) $('#search').value = '';
     updateGenres(); renderPage(); window.scrollTo({ top: 0, behavior: 'smooth' });
     if (page === 'schedule' && !state.scheduleMeta && !state.scheduleLoading && !state.scheduleError) loadSchedule();
@@ -499,7 +516,7 @@
     state.quarter += delta;
     if (state.quarter < 0) { state.quarter = 3; state.year--; }
     if (state.quarter > 3) { state.quarter = 0; state.year++; }
-    state.limit = 3; state.hero = 0;
+    state.limit = 5; state.hero = 0;
     if (state.page === 'schedule' || state.page === 'watchlist') state.page = 'seasons';
     loadSeason();
   }
@@ -518,15 +535,16 @@
       $('#sort').addEventListener('change', event => { state.sort = event.target.value; renderCatalog(); });
     }
     if ($('#search')) {
-      $('#search').addEventListener('input', event => { state.query = event.target.value; state.limit = state.query.trim() ? Infinity : 3; renderCatalog(); });
-      $('#search').addEventListener('keydown', event => { if (event.key === 'Escape') { event.target.value = ''; state.query = ''; state.limit = 3; renderCatalog(); } });
+      $('#search').addEventListener('input', event => { state.query = event.target.value; state.limit = state.query.trim() ? Infinity : 5; renderCatalog(); });
+      $('#search').addEventListener('keydown', event => { if (event.key === 'Escape') { event.target.value = ''; state.query = ''; state.limit = 5; renderCatalog(); } });
     }
     if ($('#hero-save')) $('#hero-save').addEventListener('click', () => { const item = currentHero(); if (item) toggleSave(item.id); });
     if ($('#hero-detail')) $('#hero-detail').addEventListener('click', () => { const item = currentHero(); if (item) openDetail(item.id); });
-    if ($('#load-more')) $('#load-more').addEventListener('click', () => { state.limit += 6; renderCatalog(); });
+    if ($('#load-more')) $('#load-more').addEventListener('click', () => { state.limit += 5; renderCatalog(); });
     if ($('#season-prev')) $('#season-prev').addEventListener('click', () => stepSeason(-1));
     if ($('#season-next')) $('#season-next').addEventListener('click', () => stepSeason(1));
     if ($('#refresh-data')) $('#refresh-data').addEventListener('click', () => { loadSeason(true); loadSchedule(true); });
+    window.addEventListener('anime:bannerchange', event => { if (currentHero()?.malId === event.detail?.malId) renderHero(); });
     if ($('#profile-button')) {
       $('#profile-button').hidden = true;
       $('#profile-button').addEventListener('click', () => window.AnimeMembership?.openProfile?.());
