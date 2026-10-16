@@ -6,6 +6,8 @@ Bu sürüm yerel geliştirme içindir; bu değişiklikler canlı bir adrese yay�
 
 ## Localhostta açma
 
+Windows'ta **Siteyi-Ac.cmd** dosyasına çift tıklayabilirsin. Yanıt veren site varsa onu kullanır; yoksa sunucuyu başlatır ve hazır olunca tarayıcıyı açar. Bağlantı kontrolü süre sınırlıdır ve bekleme durumu ekranda gösterilir. Eski sunucu yanıt vermiyorsa kısa bir beklemenin ardından boş bir portta yeni oturum açar. 5173 portu kullanımda olduğunda başka bir boş yerel port seçer ve doğru adresi gösterir. Yeni başlatılan sunucunun penceresini site açıkken açık tut.
+
 Node.js 22.13 veya üzeri ile proje klasöründe:
 
 ```sh
@@ -58,6 +60,6 @@ npx tsc --noEmit
 npm run build
 ```
 
-70 test gerçek SQL migrationlarıyla üyelik, oturum, liste, yetki, profil fotoğrafı ve banner kurallarını sınar. Localhost üzerinde gerçek Workers scrypt, kayıt/giriş/çıkış, çerez ve kişisel liste akışı ayrıca doğrulanmıştır.
+Testler gerçek SQL migrationlarıyla üyelik, oturum, liste, yetki, profil fotoğrafı ve banner kurallarını; başlatıcı testleri de mevcut sunucuyu kullanma, yanıt vermeyen bağlantıdan kurtulma, gecikmeli başlangıç ve dolu port davranışlarını sınar. Localhost üzerinde gerçek Workers scrypt, kayıt/giriş/çıkış, çerez ve kişisel liste akışı ayrıca doğrulanmıştır.
 
 Kaynak pakete `.env`, `.dev.vars`, `.wrangler`, `node_modules`, yerel hesaplar veya parolalar eklenmemelidir. GitHub'a yalnız kaynak dosyalarını gönder.

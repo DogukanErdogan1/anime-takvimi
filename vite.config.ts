@@ -46,6 +46,7 @@ export default defineConfig(async ({ command }) => {
 
   return {
     server: {
+      ...(process.env.ANIME_LOCAL_LAUNCHER === "1" ? { strictPort: true } : {}),
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
         : {}),

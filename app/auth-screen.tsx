@@ -1,11 +1,13 @@
 import { AuthForm } from './auth-form';
+import { BrandFilter } from './brand-filter';
 
 export function AuthScreen({mode, returnTo}: {mode:'login'|'register'|'logout';returnTo:string}) {
   const register = mode === 'register', logout = mode === 'logout';
   const other = `${register ? '/giris' : '/uye-ol'}?return_to=${encodeURIComponent(returnTo)}`;
   return <main className="auth-page">
+    <BrandFilter/>
     <section className="auth-story" aria-label="Anime Takvimi">
-      <a href="/" className="auth-brand"><span>A</span> ANİME TAKVİMİ</a>
+      <a href="/" className="auth-brand" aria-label="Anime Takvimi ana sayfa"><img className="brand-logo brand-logo-on-dark" src="/site/assets/anime-takvimi-logo.png" alt="Anime Takvimi" width="2172" height="724"/></a>
       <div className="auth-story-content"><span className="auth-eyebrow">HER HİKÂYENİN BİR TAKİPÇİSİ VAR</span><h2>Bir sonraki<br/>favorin burada.</h2><p>Yeni seriler keşfet. Bölümlerini takip et.<br/>Kendi anime dünyanı oluştur.</p><div className="auth-preview" aria-hidden="true"><span>İZLEME LİSTEM</span><div><i>01</i><b>Yeni hikâyelere yer aç<small>Keşfet · Kaydet · İzle</small></b><em>✦</em></div><div><i>02</i><b>Kaldığın yeri hatırla<small>Her bölümde bir adım daha</small></b><em>✓</em></div><div><i>03</i><b>Favorilerini yanında tut<small>Sana ait bir koleksiyon</small></b><em>♡</em></div></div></div>
       <p className="auth-story-footer">Yeni hikâyeler, yeni favoriler.</p>
     </section>
