@@ -2,7 +2,7 @@
   if (window.__animeSiteBooted) return;
   window.__animeSiteBooted = true;
   (async () => {
-    for (const name of ['icons.js','data-provider.js','hero-banners.js','app.js','membership.js']) {
+    for (const name of ['icons.js','data-provider.js','hero-banners.js','schedule-map.js','schedule-view.js','app.js','membership.js']) {
       await new Promise((resolve,reject) => {
         const script = document.createElement('script');
         script.src = '/site/' + name;
@@ -12,6 +12,7 @@
         document.head.appendChild(script);
       });
     }
+    window.dispatchEvent(new CustomEvent('anime:ready'));
   })().catch(() => {
     const status = document.getElementById('account-status');
     if (status) status.textContent = 'Site dosyaları yüklenemedi. Sayfayı yenileyerek tekrar deneyin.';

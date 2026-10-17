@@ -1,0 +1,889 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "bf0e7a73-8957-4dff-868c-2c09fec00dcd",
+  "prevId": "e7dab21b-acc4-461d-b878-e058aa9cf38a",
+  "tables": {
+    "admin_audit": {
+      "name": "admin_audit",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "metadata_json": {
+          "name": "metadata_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "audit_created_idx": {
+          "name": "audit_created_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "admin_audit_actor_id_members_id_fk": {
+          "name": "admin_audit_actor_id_members_id_fk",
+          "tableFrom": "admin_audit",
+          "tableTo": "members",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "admin_audit_target_id_members_id_fk": {
+          "name": "admin_audit_target_id_members_id_fk",
+          "tableFrom": "admin_audit",
+          "tableTo": "members",
+          "columnsFrom": [
+            "target_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "audit_action_check": {
+          "name": "audit_action_check",
+          "value": "\"admin_audit\".\"action\" = 'member_status'"
+        },
+        "audit_metadata_check": {
+          "name": "audit_metadata_check",
+          "value": "json_valid(\"admin_audit\".\"metadata_json\") AND length(\"admin_audit\".\"metadata_json\") <= 512"
+        }
+      }
+    },
+    "anime_banners": {
+      "name": "anime_banners",
+      "columns": {
+        "mal_id": {
+          "name": "mal_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "anime_banners_updated_by_members_id_fk": {
+          "name": "anime_banners_updated_by_members_id_fk",
+          "tableFrom": "anime_banners",
+          "tableTo": "members",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "banner_id_check": {
+          "name": "banner_id_check",
+          "value": "\"anime_banners\".\"mal_id\" BETWEEN 1 AND 2147483647"
+        },
+        "banner_type_check": {
+          "name": "banner_type_check",
+          "value": "\"anime_banners\".\"content_type\" IN ('image/png','image/jpeg','image/webp')"
+        }
+      }
+    },
+    "anime_reviews": {
+      "name": "anime_reviews",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "anime_id": {
+          "name": "anime_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "spoiler": {
+          "name": "spoiler",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "score": {
+          "name": "score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "hidden": {
+          "name": "hidden",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "hidden_by": {
+          "name": "hidden_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "hidden_at": {
+          "name": "hidden_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "review_author_anime_idx": {
+          "name": "review_author_anime_idx",
+          "columns": [
+            "anime_id",
+            "user_id"
+          ],
+          "isUnique": true
+        },
+        "reviews_visible_idx": {
+          "name": "reviews_visible_idx",
+          "columns": [
+            "anime_id",
+            "hidden",
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "anime_reviews_user_id_members_id_fk": {
+          "name": "anime_reviews_user_id_members_id_fk",
+          "tableFrom": "anime_reviews",
+          "tableTo": "members",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "anime_reviews_hidden_by_members_id_fk": {
+          "name": "anime_reviews_hidden_by_members_id_fk",
+          "tableFrom": "anime_reviews",
+          "tableTo": "members",
+          "columnsFrom": [
+            "hidden_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_anime_check": {
+          "name": "review_anime_check",
+          "value": "\"anime_reviews\".\"anime_id\" BETWEEN 1 AND 9999999999"
+        },
+        "review_body_check": {
+          "name": "review_body_check",
+          "value": "length(trim(\"anime_reviews\".\"body\")) BETWEEN 1 AND 2000"
+        },
+        "review_spoiler_check": {
+          "name": "review_spoiler_check",
+          "value": "\"anime_reviews\".\"spoiler\" IN (0,1)"
+        },
+        "review_score_check": {
+          "name": "review_score_check",
+          "value": "\"anime_reviews\".\"score\" IS NULL OR \"anime_reviews\".\"score\" BETWEEN 1 AND 10"
+        },
+        "review_hidden_check": {
+          "name": "review_hidden_check",
+          "value": "\"anime_reviews\".\"hidden\" IN (0,1)"
+        }
+      }
+    },
+    "app_settings": {
+      "name": "app_settings",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "settings_key_check": {
+          "name": "settings_key_check",
+          "value": "\"app_settings\".\"key\" = 'admin_owner'"
+        }
+      }
+    },
+    "auth_accounts": {
+      "name": "auth_accounts",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_salt": {
+          "name": "password_salt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_algorithm": {
+          "name": "password_algorithm",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_parameters": {
+          "name": "password_parameters",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_accounts_email_unique": {
+          "name": "auth_accounts_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "auth_accounts_user_id_members_id_fk": {
+          "name": "auth_accounts_user_id_members_id_fk",
+          "tableFrom": "auth_accounts",
+          "tableTo": "members",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_email_check": {
+          "name": "auth_email_check",
+          "value": "length(\"auth_accounts\".\"email\") BETWEEN 3 AND 254 AND \"auth_accounts\".\"email\" = lower(\"auth_accounts\".\"email\")"
+        },
+        "auth_password_parameters_check": {
+          "name": "auth_password_parameters_check",
+          "value": "json_valid(\"auth_accounts\".\"password_parameters\")"
+        },
+        "auth_password_salt_check": {
+          "name": "auth_password_salt_check",
+          "value": "length(\"auth_accounts\".\"password_salt\") = 64"
+        }
+      }
+    },
+    "auth_rate_limits": {
+      "name": "auth_rate_limits",
+      "columns": {
+        "bucket_key": {
+          "name": "bucket_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reset_at": {
+          "name": "reset_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_rate_expiry_idx": {
+          "name": "auth_rate_expiry_idx",
+          "columns": [
+            "reset_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_rate_attempts_check": {
+          "name": "auth_rate_attempts_check",
+          "value": "\"auth_rate_limits\".\"attempts\" >= 1"
+        }
+      }
+    },
+    "auth_sessions": {
+      "name": "auth_sessions",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_sessions_user_idx": {
+          "name": "auth_sessions_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "auth_sessions_expiry_idx": {
+          "name": "auth_sessions_expiry_idx",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auth_sessions_user_id_auth_accounts_user_id_fk": {
+          "name": "auth_sessions_user_id_auth_accounts_user_id_fk",
+          "tableFrom": "auth_sessions",
+          "tableTo": "auth_accounts",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_token_hash_check": {
+          "name": "auth_token_hash_check",
+          "value": "length(\"auth_sessions\".\"token_hash\") = 64"
+        },
+        "auth_session_expiry_check": {
+          "name": "auth_session_expiry_check",
+          "value": "\"auth_sessions\".\"expires_at\" > \"auth_sessions\".\"created_at\""
+        }
+      }
+    },
+    "community_rate_limits": {
+      "name": "community_rate_limits",
+      "columns": {
+        "bucket_key": {
+          "name": "bucket_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reset_at": {
+          "name": "reset_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "community_rate_attempts_check": {
+          "name": "community_rate_attempts_check",
+          "value": "\"community_rate_limits\".\"attempts\" BETWEEN 1 AND 10"
+        }
+      }
+    },
+    "member_avatars": {
+      "name": "member_avatars",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "member_avatars_user_id_members_id_fk": {
+          "name": "member_avatars_user_id_members_id_fk",
+          "tableFrom": "member_avatars",
+          "tableTo": "members",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "avatar_type_check": {
+          "name": "avatar_type_check",
+          "value": "\"member_avatars\".\"content_type\" IN ('image/png','image/jpeg','image/webp')"
+        },
+        "avatar_key_check": {
+          "name": "avatar_key_check",
+          "value": "length(\"member_avatars\".\"object_key\") = 108 AND substr(\"member_avatars\".\"object_key\",1,7) = 'avatar/'"
+        }
+      }
+    },
+    "member_libraries": {
+      "name": "member_libraries",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "library_json": {
+          "name": "library_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "member_libraries_user_id_members_id_fk": {
+          "name": "member_libraries_user_id_members_id_fk",
+          "tableFrom": "member_libraries",
+          "tableTo": "members",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "library_json_check": {
+          "name": "library_json_check",
+          "value": "json_valid(\"member_libraries\".\"library_json\") AND length(\"member_libraries\".\"library_json\") <= 1048576"
+        }
+      }
+    },
+    "member_profiles": {
+      "name": "member_profiles",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "is_public": {
+          "name": "is_public",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "member_profiles_user_id_members_id_fk": {
+          "name": "member_profiles_user_id_members_id_fk",
+          "tableFrom": "member_profiles",
+          "tableTo": "members",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "profile_bio_check": {
+          "name": "profile_bio_check",
+          "value": "length(\"member_profiles\".\"bio\") <= 500"
+        },
+        "profile_public_check": {
+          "name": "profile_public_check",
+          "value": "\"member_profiles\".\"is_public\" IN (0,1)"
+        }
+      }
+    },
+    "members": {
+      "name": "members",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'member'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "members_created_idx": {
+          "name": "members_created_idx",
+          "columns": [
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "members_email_idx": {
+          "name": "members_email_idx",
+          "columns": [
+            "email"
+          ],
+          "isUnique": false
+        },
+        "members_single_admin": {
+          "name": "members_single_admin",
+          "columns": [
+            "role"
+          ],
+          "isUnique": true,
+          "where": "\"members\".\"role\" = 'admin'"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "members_role_check": {
+          "name": "members_role_check",
+          "value": "\"members\".\"role\" IN ('admin','member')"
+        },
+        "members_status_check": {
+          "name": "members_status_check",
+          "value": "\"members\".\"status\" IN ('active','suspended')"
+        },
+        "members_name_check": {
+          "name": "members_name_check",
+          "value": "length(\"members\".\"display_name\") BETWEEN 2 AND 40"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

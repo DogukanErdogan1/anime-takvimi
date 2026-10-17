@@ -108,6 +108,7 @@
     const avatarButton = avatarForm?.querySelector('button[type="submit"]');
     if (avatarButton) avatarButton.disabled = state.avatarUploading || !activeMember();
     if (state.adminOpen && !admin()) closeAdmin();
+    window.dispatchEvent(new CustomEvent('anime:accountchange'));
   }
 
   function expireSession(error) {
@@ -181,7 +182,7 @@
     } catch (error) {
       if (actor !== state.actor || userId !== state.scopeUserId) return;
       if (!expireSession(error) && !blockOnForbidden(error)) setNotice('Hesap listesi alınamadı. Yalnızca bu hesaba ait cihaz önbelleği gösteriliyor.', 'error', 'retry-library');
-    } finally { if (actor === state.actor) state.libraryLoading = false; }
+    } finally { if (actor === state.actor) { state.libraryLoading = false; window.dispatchEvent(new CustomEvent('anime:accountchange')); } }
   }
 
   function libraryChanged(event) {
@@ -246,6 +247,7 @@
   }
 
   function openProfile() {
+    if (window.AnimeExperienceMounted) { closeDialog(); window.dispatchEvent(new CustomEvent('anime:profile')); return; }
     if (!state.account?.authenticated) return false;
     if (!registered()) { openRegistration(); return true; }
     const user = state.account.user, counts = stats();
@@ -291,7 +293,9 @@
   function openSettings() {
     if (!registered()) return;
     const user = state.account.user;
-    openDialog(`<section class="membership-profile"><span class="dialog-kicker">Hesap bilgilerin</span><h2 id="membership-title" class="dialog-title">Hesap ayarları</h2><dl class="dialog-facts"><div><dt>Görünen ad</dt><dd>${escape(user.displayName)}</dd></div><div><dt>E-posta adresi</dt><dd>${escape(user.email)}</dd></div><div><dt>Hesap kimliği</dt><dd><input class="account-id-field" aria-label="Hesap kimliği" readonly value="${escape(user.id)}"></dd></div><div><dt>Üyelik durumu</dt><dd>${state.blocked || user.status === 'suspended' ? 'Askıya alınmış' : 'Aktif'}</dd></div></dl><p class="dialog-summary">E-posta ve şifrenle giriş yaparsın. Üyelik yetkisi sunucuda kontrol edilir. Misafir listesi ve hesap listesi ayrı tutulur.</p><p class="dialog-note">${escape(state.notice)}</p><div class="dialog-actions"><button type="button" class="primary-button" data-member-action="retry-library"${activeMember() ? '' : ' disabled'}>Hesap listesini yeniden eşitle</button><button type="button" class="outline-button" data-member-action="profile">Profile dön</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a></div></section>`);
+    const photoForm = activeMember() ? "<form id=\"avatar-form\" class=\"avatar-form\"><label for=\"avatar-file\">Profil fotoğrafın</label><input id=\"avatar-file\" type=\"file\" accept=\"image/jpeg,image/png,image/webp\" required><p class=\"form-hint\">JPEG, PNG veya WebP · En fazla 2 MiB.</p><button type=\"submit\" class=\"outline-button\">Fotoğrafı kaydet</button><p id=\"avatar-message\" class=\"avatar-message\" role=\"status\" aria-live=\"polite\"></p></form>" : '';
+    openDialog(`<section class="membership-profile"><span class="dialog-kicker">Hesap bilgilerin</span><h2 id="membership-title" class="dialog-title">Hesap ayarları</h2>${photoForm}<dl class="dialog-facts"><div><dt>Görünen ad</dt><dd>${escape(user.displayName)}</dd></div><div><dt>E-posta adresi</dt><dd>${escape(user.email)}</dd></div><div><dt>Hesap kimliği</dt><dd><input class="account-id-field" aria-label="Hesap kimliği" readonly value="${escape(user.id)}"></dd></div><div><dt>Üyelik durumu</dt><dd>${state.blocked || user.status === 'suspended' ? 'Askıya alınmış' : 'Aktif'}</dd></div></dl><p class="dialog-summary">E-posta ve şifrenle giriş yaparsın. Üyelik yetkisi sunucuda kontrol edilir. Misafir listesi ve hesap listesi ayrı tutulur.</p><p class="dialog-note">${escape(state.notice)}</p><div class="dialog-actions"><button type="button" class="primary-button" data-member-action="retry-library"${activeMember() ? '' : ' disabled'}>Hesap listesini yeniden eşitle</button><button type="button" class="outline-button" data-member-action="profile">Profile dön</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a></div></section>`);
+    $('#avatar-form')?.addEventListener('submit', uploadAvatar);
   }
 
   function enforceAdminLayout() {
@@ -301,6 +305,7 @@
     if ($('#page-title')) $('#page-title').textContent = 'Üye Yönetimi';
     if ($('#page-subtitle')) $('#page-subtitle').textContent = 'Üyeleri ara ve üyelik durumlarını yönet.';
     document.body.dataset.page = 'admin';
+    window.dispatchEvent(new CustomEvent('anime:adminchange'));
     document.querySelectorAll('#nav-items [data-page]').forEach(button => { button.classList.remove('active'); button.removeAttribute('aria-current'); });
     $('#admin-nav')?.classList.add('active'); $('#admin-nav')?.setAttribute('aria-current', 'page');
   }
@@ -414,8 +419,8 @@
 
   function init() {
     window.AnimeMembership = {
-      openProfile, isAdminOpen: () => state.adminOpen,
-      getStatus: () => ({ authenticated: state.account?.authenticated === true, registered: registered(), role: registered() ? state.account.user.role : null, scopeUserId: state.scopeUserId, saving: state.saving, pending: Boolean(state.pending) })
+      openProfile, openSettings, closeAdmin, getAccount: () => state.account ? copy(state.account) : null, isAdminOpen: () => state.adminOpen,
+      getStatus: () => ({ authenticated: state.account?.authenticated === true, registered: registered(), role: registered() ? state.account.user.role : null, scopeUserId: state.scopeUserId, saving: state.saving, pending: Boolean(state.pending), libraryLoading:state.libraryLoading, blocked:state.blocked })
     };
     if ($('#membership-close')) $('#membership-close').addEventListener('click', closeDialog);
     if ($('#membership-dialog')) $('#membership-dialog').addEventListener('click', event => {
@@ -436,6 +441,8 @@
       clearTimeout(searchTimer); searchTimer = setTimeout(loadMembers, 300);
     });
     window.addEventListener('anime:librarychange', libraryChanged);
+    window.addEventListener('anime:navigate', () => { if (state.adminOpen) closeAdmin(); });
+    window.addEventListener('hashchange', () => { if (state.adminOpen) closeAdmin(); });
     window.addEventListener('anime:viewrender', enforceAdminLayout);
     document.addEventListener('click', preventUnavailableLibraryChange, true);
     document.addEventListener('change', preventUnavailableLibraryChange, true);

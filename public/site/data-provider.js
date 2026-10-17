@@ -198,6 +198,72 @@
     }
   }
 
+  function previewPosters(items) {
+    const selected = [], ids = new Set(), images = new Set();
+    for (const item of items) {
+      if (!item || !count(item.malId) || item.id !== `mal-${item.malId}` || typeof item.title !== 'string' || !item.title.trim()) continue;
+      const image = safeImage(item.image);
+      if (!image || ids.has(item.malId) || images.has(image)) continue;
+      selected.push({...item, image}); ids.add(item.malId); images.add(image);
+      if (selected.length === 3) break;
+    }
+    return selected;
+  }
+
+  async function seasonPreview(year, season, {signal, force} = {}) {
+    checkAbort(signal);
+    const full = readCache(`season-${year}-${season}`);
+    const fresh = record => record && Date.now() - record.fetchedAt >= 0 && Date.now() - record.fetchedAt < CACHE_TTL;
+    const resultFromCache = (record, stale) => ({anime: previewPosters(record.anime), fetchedAt: record.fetchedAt, stale, cached: true, source: 'MyAnimeList / Tenrai'});
+    if (!force && fresh(full)) {
+      const result = resultFromCache(full, false); checkAbort(signal); return result;
+    }
+    const key = `season-preview-${year}-${season}`;
+    const stored = readCache(key);
+    // Preview records contain only selected posters; a damaged browser cache
+    // must not turn unsafe or duplicated image entries into a fresh preview.
+    const cached = stored && stored.anime.length <= 3 && previewPosters(stored.anime).length === stored.anime.length ? stored : null;
+    if (!force && fresh(cached)) {
+      const result = resultFromCache(cached, false); checkAbort(signal); return result;
+    }
+    try {
+      const response = await request(`/seasons/${year}/${season}?sfw&order_by=members&sort=desc&limit=12&page=1`, signal);
+      checkAbort(signal);
+      if (!response || !Array.isArray(response.data)) throw new Error('Veri servisinden beklenmeyen bir yanıt geldi.');
+      const anime = previewPosters(response.data.map(normalize).filter(Boolean));
+      checkAbort(signal);
+      const result = {anime, fetchedAt: Date.now(), stale: false, cached: false, source: 'MyAnimeList / Tenrai'};
+      writeCache(key, result);
+      return result;
+    } catch (error) {
+      checkAbort(signal);
+      if (error.name === 'AbortError') throw error;
+      if (cached) return resultFromCache(cached, true);
+      if (error.status) throw error;
+      throw new Error(error.message && error.message !== 'Failed to fetch' ? error.message : 'Anime verisine bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+    }
+  }
+
+  const detailCache = new Map();
+  async function getDetails(malId, {signal} = {}) {
+    checkAbort(signal);
+    if (!Number.isInteger(malId) || malId < 1 || malId > 2147483647) throw new Error('Geçersiz anime numarası.');
+    const cached = detailCache.get(malId);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) return cached.data;
+    const response = await request(`/anime/${malId}/full`, signal); checkAbort(signal);
+    if (!response?.data || response.data.mal_id !== malId) throw new Error('Anime ayrıntıları alınamadı.');
+    const raw = response.data, youtubeId = raw.trailer?.youtube_id;
+    const trailerUrl = typeof youtubeId === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId) ? `https://www.youtube.com/watch?v=${youtubeId}` : null;
+    const relations = [], ids = new Set();
+    for (const group of (Array.isArray(raw.relations) ? raw.relations : [])) for (const entry of (Array.isArray(group?.entry) ? group.entry : [])) {
+      if (entry?.type !== 'anime' || !Number.isInteger(entry.mal_id) || entry.mal_id < 1 || entry.mal_id > 2147483647 || ids.has(entry.mal_id)) continue;
+      ids.add(entry.mal_id); relations.push({id:entry.mal_id,title:text(entry.name,500) || `MyAnimeList #${entry.mal_id}`,url:`https://myanimelist.net/anime/${entry.mal_id}`});
+      if (relations.length >= 20) break;
+    }
+    const data = {trailerUrl,relations:relations.slice(0,20)};
+    detailCache.set(malId,{fetchedAt:Date.now(),data}); return data;
+  }
+
   window.AnimeData = Object.freeze({
     normalize,
     safeImage,
@@ -206,6 +272,11 @@
       if (!Number.isInteger(year) || year < 1917 || year > 2999 || !SEASONS.includes(season)) return Promise.reject(new Error('Geçersiz sezon seçimi.'));
       return load(`season-${year}-${season}`, `/seasons/${year}/${season}?sfw&order_by=members&sort=desc`, options);
     },
-    getSchedule(options = {}) { return load('schedules', '/schedules?sfw', options); }
+    getSeasonPreview(year, season, options = {}) {
+      if (!Number.isInteger(year) || year < 1917 || year > 2999 || !SEASONS.includes(season)) return Promise.reject(new Error('Geçersiz sezon seçimi.'));
+      return seasonPreview(year, season, options);
+    },
+    getSchedule(options = {}) { return load('schedules', '/schedules?sfw', options); },
+    getDetails
   });
 })();

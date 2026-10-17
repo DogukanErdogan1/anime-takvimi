@@ -65,3 +65,39 @@ export const animeBanners = sqliteTable('anime_banners', {
   check('banner_id_check',sql`${table.malId} BETWEEN 1 AND 2147483647`),
   check('banner_type_check',sql`${table.contentType} IN ('image/png','image/jpeg','image/webp')`),
 ]);
+export const memberProfiles = sqliteTable('member_profiles', {
+  userId:text('user_id').primaryKey().references(()=>members.id),
+  bio:text('bio').notNull().default(''), isPublic:integer('is_public').notNull().default(0),
+  updatedAt:text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+},table=>[
+  check('profile_bio_check',sql`length(${table.bio}) <= 500`),
+  check('profile_public_check',sql`${table.isPublic} IN (0,1)`),
+]);
+export const animeReviews = sqliteTable('anime_reviews', {
+  id:text('id').primaryKey(), animeId:integer('anime_id').notNull(),
+  userId:text('user_id').notNull().references(()=>members.id), body:text('body').notNull(),
+  spoiler:integer('spoiler').notNull().default(0), score:integer('score'),
+  createdAt:text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt:text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  hidden:integer('hidden').notNull().default(0),
+  hiddenBy:text('hidden_by').references(()=>members.id), hiddenAt:text('hidden_at'),
+},table=>[
+  check('review_anime_check',sql`${table.animeId} BETWEEN 1 AND 9999999999`),
+  check('review_body_check',sql`length(trim(${table.body})) BETWEEN 1 AND 2000`),
+  check('review_spoiler_check',sql`${table.spoiler} IN (0,1)`),
+  check('review_score_check',sql`${table.score} IS NULL OR ${table.score} BETWEEN 1 AND 10`),
+  check('review_hidden_check',sql`${table.hidden} IN (0,1)`),
+  uniqueIndex('review_author_anime_idx').on(table.animeId,table.userId),
+  index('reviews_visible_idx').on(table.animeId,table.hidden,table.createdAt,table.id),
+]);
+export const communityRateLimits = sqliteTable('community_rate_limits', {
+  bucketKey:text('bucket_key').primaryKey(), resetAt:integer('reset_at').notNull(), attempts:integer('attempts').notNull(),
+},table=>[check('community_rate_attempts_check',sql`${table.attempts} BETWEEN 1 AND 10`)]);
+export const memberCovers = sqliteTable('member_covers', {
+  userId:text('user_id').primaryKey().references(()=>members.id), objectKey:text('object_key').notNull(),
+  contentType:text('content_type', {enum:['image/png','image/jpeg','image/webp']}).notNull(),
+  updatedAt:text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+},table=>[
+  check('cover_type_check',sql`${table.contentType} IN ('image/png','image/jpeg','image/webp')`),
+  check('cover_key_check',sql`length(${table.objectKey}) = 107 AND substr(${table.objectKey},1,6) = 'cover/'`),
+]);

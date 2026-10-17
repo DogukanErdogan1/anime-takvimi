@@ -29,7 +29,9 @@ Yerel D1 ve R2 verileri `.wrangler/state` içinde tutulur. Bu klasörü silme ve
 - Formlar aynı origin ve JSON kontrolleriyle korunur. Giriş ve kayıt deneme limitleri D1'de kalıcıdır. Hesap anahtarı rastgele oluşturulur; e-posta başka eski hesaba veya yönetici rolüne bağlanmaz.
 - E-posta doğrulama ve şifre sıfırlama e-postaları bu sürümde yoktur; henüz bir e-posta gönderim hizmeti bağlanmamıştır.
 
-Profil düğmesi yalnız girişten sonra görünür. Fotoğraf yoksa baş harfler kullanılır. Profilim ekranından PNG/JPEG/WebP fotoğrafı yüklenebilir (en fazla 2 MiB). Fotoğraf okuma/yazma yalnız aktif hesabın kendi kimliğine izin verir.
+Profil düğmesi yalnız girişten sonra görünür. Fotoğraf yoksa baş harfler kullanılır. Profilim → Hesap ayarları ekranından PNG/JPEG/WebP fotoğrafı yüklenebilir (en fazla 2 MiB). Fotoğraf okuma/yazma yalnız aktif hesabın kendi kimliğine izin verir.
+
+Profil kapağındaki **Kapağı değiştir** düğmesiyle kendi arka planını yükleyebilirsin. PNG, JPEG veya WebP kabul edilir; dosya en fazla 2 MiB olabilir. Seçilen görsel kaydetmeden önce önizlenir ve kaydedildiğinde hesaba bağlı olarak R2'de saklanır. Özel kapağı kaldırınca API'den gelen otomatik anime görseli kullanılır. Profil özelken kapak da özeldir; profilini herkese açarsan kapak görseli de paylaşılır. Kaldırılmış veya değiştirilmiş görsellerin eski sürüm bağlantıları geçersiz olur.
 
 ## Kendi hesabını yönetici yapma
 
@@ -50,7 +52,22 @@ Yönetim → **Anime banner görseli** bölümünde MAL anime numarasını girip
 
 Misafir listesi cihazda, üyelerin listeleri hesap kimliğine göre D1'de saklanır. Misafir listesi girişte otomatik hesaba aktarılmaz. Hesaplar birbirlerinin listelerini okuyamaz veya değiştiremez. Askıya alma oturum ve yazma erişimini sunucuda durdurur.
 
-Sezon/tür/format filtreleri, arama, sıralama ve kart/liste görünümü bulunur. Yayın saatleri biliniyorsa Türkiye saatine çevrilir. Takip işaretleri cihaz bildirimi göndermez. Sitedeki liste MyAnimeList hesabıyla eşitlenmez.
+Sezon kütüphanesinde yıl seçip Kış, İlkbahar, Yaz veya Sonbahar koleksiyonunu açabilirsin. Seçilen sezonun bütün formatları birlikte gösterilir; arama, tür/format filtreleri, sıralama ve kart/liste görünümü bulunur. Haftalık yayın haritası yalnız Yayın Takvimi bölümündedir. Yayın haritasında günler yatay satırlarda, animeler Türkiye saatine göre konumlanır; çakışan yayınlar ayrı şeritlerde gösterilir. Anime araması, Listemdekiler filtresi, hafta gezinmesi ve yatay kaydırma bulunur. Diğer haftalar güncel yayın düzeninin tekrarını gösterir; kaynak kesin bölüm tarihleri veya gelecek bölüm numarası sağlamaz. Sitedeki liste MyAnimeList hesabıyla eşitlenmez.
+
+Sezon kartları, seçilen yılın ilgili sezonuna ait API afişlerinden en fazla üçünü gösterir. Önizlemeler yalnız ilk sayfadan alınır ve ayrı olarak altı saat önbelleğe kaydedilir; sezonu açınca tam katalog yüklenir. Görsel alınamazsa durum mesajı ve tekrar deneme düğmesi görünür. Yıl değişiminde eski görsel istekleri iptal edilir.
+
+## React kişisel deneyimi
+
+Sinematik ana sayfa, izleme listesi, anime ayrıntıları, profil ve bildirim kontrolleri React/TypeScript bileşenleridir. Sezon arşivi ve yayın haritası mevcut JavaScript veri katmanını kullanır. Ana sayfa ve öneriler gerçek katalog, kaydedilen animeler ve türlerden üretilir; örnek kullanıcı veya uydurulmuş istatistik gösterilmez.
+
+- Dört izleme durumu, bölüm ilerlemesi, 1–10 puan, favoriler ve özel koleksiyonlar hesapla birlikte saklanır. Eski listeler korunur. Misafir değişiklikleri cihazda kalır.
+- Anime ayrıntılarındaki fragman ve bağlantılı seriler Tenrai `/anime/{id}/full` yanıtından gelir. Kaynakta bulunmayan bilgi gösterilmez.
+- Üyeler spoiler işaretli yorum yazabilir. Kendi yorumlarını veya gerçek yönetici diğer yorumları kaldırabilir. Yorum yazma sınırı uygulanır.
+- Profil varsayılan olarak özeldir. Kullanıcı isteyerek açarsa ad, biyografi, listeler ve istatistikler paylaşılabilir. E-posta ve hatırlatıcılar public profil yanıtına eklenmez.
+- Zil panelinden tarayıcı bildirimleri ayrıca açılabilir. Hatırlatmalar **site açıkken**, Türkiye saatine çevrilmiş haftalık plan üzerinden çalışır; site kapalıyken sunucudan push gönderilmez. Bildirim izni ve tercihi kullanıcı tarafından yönetilir.
+- Açık/koyu tema cihazda hatırlanır. Destekleyen tarayıcılarda ana ekrana ekleme bulunur. Service worker hesap/API yanıtlarını önbelleğe almaz; çevrimdışıyken bağlantı durumunu gösterir.
+
+`0004_community.sql` profil ve yorum tablolarını, `0005_member_covers.sql` profil kapağı kayıtlarını ekler; güncellemeden sonra yerel veritabanına `npm run db:migrate` uygulanmalıdır.
 
 ## Kontroller
 

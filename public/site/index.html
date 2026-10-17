@@ -8,9 +8,13 @@
   <title>Anime Takvimi — Yeni hikâyeler, yeni favoriler</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="schedule-map.css">
+  <link rel="stylesheet" href="season-library.css">
   <script src="icons.js" defer></script>
   <script src="data-provider.js" defer></script>
   <script src="hero-banners.js" defer></script>
+  <script src="schedule-map.js" defer></script>
+  <script src="schedule-view.js" defer></script>
   <script src="app.js" defer></script>
   <script src="membership.js" defer></script>
 </head>
@@ -28,8 +32,10 @@
       <button class="nav-item" data-page="watchlist"><span data-icon="bookmark"></span><span>Listem</span><span id="watchlist-count" class="nav-count"></span></button>
     </nav>
     <div class="rail-season"><span class="season-rule" aria-hidden="true"></span><span id="rail-year" class="rail-year">2026</span><strong id="rail-season-title">Sonbahar</strong><p>Yeni hikâyeler<br>seni bekliyor.</p></div>
-    <div class="nav-account"><a class="nav-search" href="#search" aria-label="Anime ara"><span data-icon="search"></span></a><button class="profile-button" id="profile-button" type="button" hidden aria-label="Profilim"><span class="avatar profile-avatar" aria-hidden="true"></span><span>Profilim</span><span data-icon="chevron-right"></span></button><div class="account-toolbar"><div id="account-actions" class="account-actions"></div></div></div>
+    <div class="nav-account"><div id="experience-nav-slot"></div><a class="nav-search" href="#search" aria-label="Anime ara"><span data-icon="search"></span></a><button class="profile-button" id="profile-button" type="button" hidden aria-label="Profilim"><span class="avatar profile-avatar" aria-hidden="true"></span><span>Profilim</span><span data-icon="chevron-right"></span></button><div class="account-toolbar"><div id="account-actions" class="account-actions"></div></div></div>
   </header>
+    <div id="experience-home-slot"></div>
+    <div id="season-library-art" class="season-library-art remote-art" aria-hidden="true" hidden></div>
     <header class="page-header">
       <div class="heading-block"><div class="eyebrow">SEZON REHBERİ</div><h1 id="page-title">Sonbahar 2026</h1><p id="page-subtitle">Yeni hikâyeler, yeni favoriler.</p></div>
       <div class="masthead-actions"><a class="primary-button" href="#catalog-section">Sezonu keşfet</a><button type="button" class="masthead-schedule" data-page="schedule">Yayın takvimi<span data-icon="arrow-right"></span></button></div>
@@ -41,9 +47,16 @@
   </div>
   <div class="workspace">
     <main id="main" class="main-panel" tabindex="-1">
-      <section id="schedule-aside" class="schedule-aside" aria-label="Haftalık yayın özeti"><section class="today-panel"><h2>Haftalık yayın</h2><div class="schedule-date-row"><span id="schedule-date"></span><small>Türkiye saati</small></div><div id="weekday-tabs" class="weekday-tabs" role="group" aria-label="Yayın günü"></div><div id="schedule-list" class="schedule-list"></div><p class="broadcast-note">Kaynağın haftalık programı. Bölüm gecikmeleri ve platform saatleri farklı olabilir.</p></section><button type="button" class="schedule-all text-button" data-page="schedule">Tüm takvim<span data-icon="arrow-right"></span></button></section>
       <div id="account-status" class="account-status" role="status" aria-live="polite"></div>
+      <div id="experience-page-slot"></div>
+      <section id="season-library" aria-labelledby="season-library-title" hidden>
+        <div class="season-library-heading"><h2 id="season-library-title">Bir sezon seç</h2><p>Bir yılı keşfet, hikâyeleri mevsim mevsim gez.</p></div>
+        <div class="season-year-controls"><button type="button" class="icon-button" data-library-year="-1" aria-label="Önceki yıl"><span data-icon="chevron-left"></span></button><label for="library-year">Yıl<select id="library-year" aria-label="Kütüphane yılı"></select></label><button type="button" class="icon-button" data-library-year="1" aria-label="Sonraki yıl"><span data-icon="chevron-right"></span></button></div>
+        <div id="season-year-rail" class="season-year-rail" role="group" aria-label="Yakın yıllar"></div>
+        <div id="season-shelves" class="season-shelves"></div>
+      </section>
       <section id="catalog-section" class="catalog" aria-labelledby="section-title">
+        <button id="season-library-back" class="season-library-back text-button" type="button" data-library-back hidden><span data-icon="chevron-left"></span>Sezon kütüphanesine dön</button>
         <div class="catalog-heading"><div class="catalog-title"><h2 id="section-title">Sezonu keşfet</h2><span id="results-count" class="results-count"></span></div><div class="header-controls"><label class="search-field"><span data-icon="search"></span><input id="search" type="search" placeholder="Anime ara..." autocomplete="off" aria-label="Anime ara"></label><label class="select-wrap sort-select"><span data-icon="filter"></span><select id="sort" aria-label="Sıralama"><option value="popular">Popülerlik</option><option value="rating">Puan</option><option value="title">İsim</option></select></label></div></div>
         <div class="catalog-filterbar"><div id="format-tabs" class="format-tabs" role="group" aria-label="Anime formatı"><button data-format="all" aria-pressed="false">Tümü</button><button class="active" data-format="TV" aria-pressed="true">TV</button><button data-format="Film" aria-pressed="false">Filmler</button><button data-format="OVA" aria-pressed="false">OVA</button></div><div id="catalog-controls" class="catalog-controls"><label class="select-wrap"><span>Tür:</span><select id="genre" aria-label="Anime türü"><option value="all">Tümü</option><option>Aksiyon</option><option>Fantastik</option><option>Macera</option><option>Dram</option><option>Romantik</option><option>Gizem</option><option>Bilim Kurgu</option></select></label><div class="season-picker"><button id="season-prev" class="icon-button" aria-label="Önceki sezon"><span data-icon="chevron-left"></span></button><span id="season-label">Sonbahar 2026</span><button id="season-next" class="icon-button" aria-label="Sonraki sezon"><span data-icon="chevron-right"></span></button></div><div id="view-toggle" class="view-toggle" role="group" aria-label="Görünüm"><button class="active icon-button" data-view="grid" aria-label="Kart görünümü" aria-pressed="true"><span data-icon="grid"></span></button><button class="icon-button" data-view="list" aria-label="Liste görünümü" aria-pressed="false"><span data-icon="list"></span></button></div></div></div>
         <div id="season-notice" class="season-notice" hidden></div>

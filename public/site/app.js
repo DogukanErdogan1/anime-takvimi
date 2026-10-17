@@ -9,17 +9,19 @@
   const shortDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
   const seasons = ['Kış', 'İlkbahar', 'Yaz', 'Sonbahar'];
   const seasonKeys = ['winter', 'spring', 'summer', 'fall'];
+  const libraryMinYear = 1917;
+  const libraryMaxYear = new Date().getFullYear() + 1;
   const storageBase = 'anime-takvimi-mal-v1';
   let storageKey = storageBase;
   let accountScope = null;
   const byId = new Map();
   const state = {
     page: 'discover', format: 'TV', genre: 'all', sort: 'popular', query: '',
-    view: 'grid', limit: 5, hero: 0, quarter: 3, year: 2026,
-    saved: new Set(), reminders: new Set(), progress: {}, dialogId: null,
+    view: 'grid', limit: 5, hero: 0, quarter: 3, year: 2026, libraryYear: 2026, seasonsOpen: false,
+    saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], dialogId: null,
     catalog: [], catalogKey: null, catalogMeta: null, catalogLoading: false, catalogError: null, catalogProgress: '',
     schedule: [], scheduleMeta: null, scheduleLoading: false, scheduleError: null,
-    day: 0, todayDay: 0, week: [], todayKey: ''
+    day: 0, todayDay: 0, week: [], todayKey: '', weekOffset: 0, mapSaved: false, mapQuery: ''
   };
   let seasonRequest = 0;
   let scheduleRequest = 0;
@@ -28,6 +30,49 @@
   let storageAvailable = true;
   let toastTimer;
   let heroImageRequest = 0;
+  const seasonPreviews = new Map();
+  let libraryPreviewController = null;
+  let libraryPreviewYear = null;
+
+  function stopSeasonPreviews() {
+    libraryPreviewController?.abort();
+    libraryPreviewController = null; libraryPreviewYear = null;
+    for (const [key, record] of seasonPreviews) if (record.status === 'loading') seasonPreviews.delete(key);
+  }
+
+  function ensureSeasonPreviews(year, retryQuarter = null) {
+    if (state.page !== 'seasons' || state.seasonsOpen) return;
+    if (libraryPreviewYear !== year || !libraryPreviewController || libraryPreviewController.signal.aborted) {
+      stopSeasonPreviews(); libraryPreviewYear = year; libraryPreviewController = new AbortController();
+    }
+    const controller = libraryPreviewController;
+    seasonKeys.forEach((season, quarter) => {
+      const key = `${year}-${season}`, previous = seasonPreviews.get(key);
+      const force = quarter === retryQuarter;
+      if (!force && previous && (previous.status === 'loading' || previous.status === 'error' || Date.now() - previous.checkedAt < 6 * 60 * 60 * 1000)) return;
+      const record = {status:'loading', anime:previous?.anime || [], fetchedAt:0, checkedAt:Date.now(), stale:false};
+      seasonPreviews.set(key, record);
+      Promise.resolve().then(() => {
+        if (controller.signal.aborted) throw new DOMException('İstek iptal edildi.', 'AbortError');
+        if (!window.AnimeData?.getSeasonPreview) throw new Error('Season previews unavailable');
+        return window.AnimeData.getSeasonPreview(year, season, {signal:controller.signal, force});
+      }).then(result => {
+        if (controller.signal.aborted || seasonPreviews.get(key) !== record) return;
+        const images = new Set(), ids = new Set();
+        record.anime = (Array.isArray(result?.anime) ? result.anime : []).map(normalize).filter(item => {
+          if (!item?.image || ids.has(item.id) || images.has(item.image)) return false;
+          ids.add(item.id); images.add(item.image); return true;
+        }).slice(0, 3);
+        record.status = record.anime.length ? 'ready' : 'empty';
+        record.fetchedAt = Number(result?.fetchedAt) || Date.now(); record.stale = result?.stale === true;
+      }).catch(error => {
+        if (controller.signal.aborted || seasonPreviews.get(key) !== record || error?.name === 'AbortError') return;
+        record.status = 'error';
+      }).finally(() => {
+        if (!controller.signal.aborted && state.page === 'seasons' && !state.seasonsOpen && state.libraryYear === year) renderSeasonLibrary();
+      });
+    });
+  }
 
   function safeImage(value) {
     if (typeof window.AnimeData?.safeImage === 'function') return window.AnimeData.safeImage(value);
@@ -83,6 +128,7 @@
 
   function installLibrary(stored) {
       state.saved = new Set(); state.reminders = new Set(); state.progress = {}; state.view = 'grid';
+      state.tracking = {}; state.scores = {}; state.favorites = []; state.collections = [];
       if (!stored || typeof stored !== 'object') return;
       const validId = id => typeof id === 'string' && /^mal-[1-9]\d*$/.test(id);
       if (Array.isArray(stored.saved)) state.saved = new Set(stored.saved.filter(validId));
@@ -91,6 +137,14 @@
         if (validId(id)) state.progress[id] = Math.min(9999, Math.max(0, Math.floor(Number(value) || 0)));
       });
       if (stored.savedAnime && typeof stored.savedAnime === 'object') register(Object.values(stored.savedAnime));
+      if (stored.tracking && typeof stored.tracking === 'object') Object.entries(stored.tracking).forEach(([id,value]) => {
+        if (validId(id) && ['watching','planned','completed','dropped'].includes(value)) state.tracking[id] = value;
+      });
+      if (stored.scores && typeof stored.scores === 'object') Object.entries(stored.scores).forEach(([id,value]) => {
+        if (validId(id) && Number.isInteger(value) && value >= 1 && value <= 10) state.scores[id] = value;
+      });
+      if (Array.isArray(stored.favorites)) state.favorites = [...new Set(stored.favorites.filter(validId))].slice(0,500);
+      if (Array.isArray(stored.collections)) state.collections = stored.collections.filter(list => list && typeof list.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(list.id) && typeof list.title === 'string' && list.title.trim() && Array.isArray(list.animeIds)).slice(0,100).map(list => ({id:list.id,title:list.title.trim().slice(0,60),animeIds:[...new Set(list.animeIds.filter(validId))].slice(0,500)}));
       // Preserve an identifier even if old stored metadata was missing or damaged.
       new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress)]).forEach(id => {
         if (!byId.has(id)) { const item = normalize({ id }); if (item) byId.set(id, item); }
@@ -106,10 +160,10 @@
 
   function getLibrarySnapshot() {
     const savedAnime = {};
-    new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress)]).forEach(id => {
+    new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress), ...state.favorites, ...Object.keys(state.tracking), ...Object.keys(state.scores), ...state.collections.flatMap(list => list.animeIds)]).forEach(id => {
       if (byId.has(id)) savedAnime[id] = byId.get(id);
     });
-    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime }));
+    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime, tracking:state.tracking, scores:state.scores, favorites:state.favorites, collections:state.collections }));
   }
 
   function persist(emit = true) {
@@ -159,7 +213,7 @@
     if (!state.todayKey) state.day = weekday;
     state.todayDay = weekday; state.todayKey = key;
     const monday = new Date(today); monday.setUTCDate(today.getUTCDate() - weekday);
-    state.week = days.map((_, index) => { const date = new Date(monday); date.setUTCDate(monday.getUTCDate() + index); return date; });
+    state.week = days.map((_, index) => { const date = new Date(monday); date.setUTCDate(monday.getUTCDate() + index + state.weekOffset * 7); return date; });
   }
 
   function dateLabel(date, options = {}) {
@@ -230,17 +284,66 @@
   }
 
   function renderWeekly() {
-    const entries = state.schedule.filter(item => knownBroadcast(item) && matches(item));
-    $('#card-grid').innerHTML = `<div class="weekly-schedule">${days.map((day, index) => {
-      const daily = entries.filter(item => item.day === index).sort((a, b) => a.time.localeCompare(b.time));
-      return `<section class="weekly-day${index === state.day ? ' selected-day' : ''}" aria-label="${escape(dateLabel(state.week[index]))} ${day}"><h3><span>${day}</span><small>${escape(dateLabel(state.week[index]))}</small></h3><div class="weekly-entries">${daily.length ? daily.map(item => `<article class="weekly-entry">${art(item, 'weekly-art')}<div class="weekly-copy"><span class="weekly-time">${icon('clock')}${escape(item.time)}${item.broadcastLocal ? '' : '<small>Kaynak saati</small>'}</span><h4><button class="title-button" type="button" data-action="detail" data-id="${item.id}">${escape(item.title)}</button></h4><span class="weekly-meta">Haftalık yayın · ${escape(item.format)}</span></div>${reminderButton(item)}</article>`).join('') : '<p class="aside-empty">Bu gün için saat bilgisi bulunan yayın yok.</p>'}</div></section>`;
-    }).join('')}</div>`;
-    return entries.length;
+    return window.AnimeScheduleView.mount($('#card-grid'), {state,escape,icon,poster,days,shortDays});
+  }
+
+  function renderSeasonLibrary() {
+    if (state.page !== 'seasons' || state.seasonsOpen) return;
+    const shelves = $('#season-shelves'); if (!shelves) return;
+    ensureSeasonPreviews(state.libraryYear);
+    const active = document.activeElement;
+    const focusedQuarter = shelves.contains(active) ? active?.dataset?.seasonQuarter ?? active?.dataset?.previewRetry : undefined;
+    const rail = $('#season-year-rail');
+    const focusedYear = rail?.contains(active) ? active?.dataset?.librarySelectYear : undefined;
+    const ranges = ['Ocak – Mart', 'Nisan – Haziran', 'Temmuz – Eylül', 'Ekim – Aralık'];
+    const today = state.todayKey.split('-').map(Number);
+    shelves.innerHTML = seasons.map((season, quarter) => {
+      const record = seasonPreviews.get(`${state.libraryYear}-${seasonKeys[quarter]}`);
+      const items = record?.anime || [];
+      const current = state.libraryYear === today[0] && quarter === Math.floor((today[1]-1)/3);
+      const message = record?.status === 'error' ? 'Afişler yüklenemedi' : record?.status === 'empty' ? 'Bu sezon için afiş bulunamadı' : 'Afişler yükleniyor…';
+      return `<div class="season-shelf-wrap"><button type="button" class="season-shelf season-shelf-${seasonKeys[quarter]}${current?' season-shelf-current':''}" data-season-year="${state.libraryYear}" data-season-quarter="${quarter}" aria-label="${state.libraryYear} ${season} sezonunun animelerini aç"><span class="season-shelf-art" aria-hidden="true">${items.length?`<span class="season-poster-backdrop remote-art"><img src="${escape(items[0].image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span><span class="season-poster-stack" data-poster-count="${items.length}">${items.map((item,index)=>`<span class="season-preview-poster poster-${index} remote-art">${poster(item)}</span>`).join('')}</span>`:`<span class="season-preview-state">${icon('calendar')}<span>${message}</span></span>`}${current?'<span class="season-current-badge">GÜNCEL SEZON</span>':''}${record?.stale?'<span class="season-cache-badge">Son alınan afişler</span>':''}</span><span class="season-shelf-copy"><small>${ranges[quarter]}</small><strong class="season-shelf-title">${state.libraryYear} ${season}</strong></span><span class="season-shelf-footer"><span>Animeleri keşfet</span><span class="season-shelf-arrow">${icon('arrow-right')}</span></span></button>${record?.status==='error'?`<button type="button" class="season-preview-retry text-button" data-preview-retry="${quarter}" data-preview-year="${state.libraryYear}" aria-label="${state.libraryYear} ${season} afişlerini yeniden yükle">Afişleri yeniden yükle</button>`:''}</div>`;
+    }).join('');
+    if (rail) {
+      const start = Math.max(libraryMinYear, Math.min(state.libraryYear-2, libraryMaxYear-4));
+      rail.innerHTML = Array.from({length:5}, (_,index) => start+index).map(value => `<button type="button" data-library-select-year="${value}" class="${value===state.libraryYear?'is-active':''}" aria-pressed="${value===state.libraryYear}">${value}</button>`).join('');
+    }
+    if (focusedQuarter !== undefined) shelves.querySelector(`[data-season-quarter="${focusedQuarter}"]`)?.focus({preventScroll:true});
+    if (focusedYear !== undefined) rail.querySelector(`[data-library-select-year="${focusedYear}"]`)?.focus({preventScroll:true});
+    const year = $('#library-year');
+    if (year) {
+      if (!year.options?.length) year.innerHTML = Array.from({length:libraryMaxYear-libraryMinYear+1}, (_,i) => libraryMaxYear-i).map(value => `<option value="${value}">${value}</option>`).join('');
+      year.value = String(state.libraryYear);
+    }
+    document.querySelectorAll('[data-library-year]').forEach(button => { button.disabled = Number(button.dataset.libraryYear) < 0 ? state.libraryYear <= libraryMinYear : state.libraryYear >= libraryMaxYear; });
+    const headerArt = $('#season-library-art');
+    if (headerArt) {
+      const featured = seasonKeys.map(key => seasonPreviews.get(`${state.libraryYear}-${key}`)).find(record => record?.anime?.length);
+      headerArt.innerHTML = featured ? featured.anime.map(item => `<img src="${escape(item.image)}" alt="" decoding="async" referrerpolicy="no-referrer">`).join('') : '';
+      headerArt.hidden = !featured;
+    }
+  }
+
+  function changeLibraryYear(year) {
+    if (!Number.isInteger(year) || year < libraryMinYear || year > libraryMaxYear) return;
+    state.libraryYear = year; renderSeasonLibrary();
+  }
+
+  function openSeason(year, quarter) {
+    if (!Number.isInteger(year) || year < libraryMinYear || year > libraryMaxYear || !Number.isInteger(quarter) || quarter < 0 || quarter > 3) return;
+    state.page = 'seasons'; state.seasonsOpen = true; state.libraryYear = year;
+    stopSeasonPreviews();
+    state.year = year; state.quarter = quarter; state.format = 'all';
+    state.query = ''; state.genre = 'all'; state.limit = Infinity; state.hero = 0;
+    if ($('#search')) $('#search').value = '';
+    try { history.replaceState(null, '', '#seasons'); } catch (_) { /* The selected season still opens. */ }
+    loadSeason(); window.scrollTo({top: 0, behavior: 'smooth'});
   }
 
   function renderEmpty(count, loading, error) {
     const empty = $('#empty-state');
     if (!empty) return;
+    if (state.page === 'schedule') { empty.hidden = true; return; }
     empty.hidden = count > 0 || loading || Boolean(error);
     if (empty.hidden) return;
     const hasFilters = Boolean(state.query.trim()) || state.genre !== 'all' || state.format !== 'all';
@@ -264,8 +367,8 @@
     grid.classList.toggle('schedule-view', weekly);
     grid.classList.toggle('data-loading', loading);
     grid.setAttribute('aria-busy', String(loading));
-    if (loading) grid.innerHTML = skeletons();
-    else if (weekly) count = renderWeekly();
+    if (weekly) count = renderWeekly();
+    else if (loading) grid.innerHTML = skeletons();
     else {
       const source = personal ? savedItems() : state.catalog;
       const filtered = sorted(source.filter(item => matches(item, !personal)));
@@ -279,17 +382,10 @@
     }
     renderEmpty(count, loading, error);
     if ($('#results-count')) $('#results-count').textContent = loading ? 'Yükleniyor…' : `${count} ${weekly ? 'haftalık yayın' : 'anime'}`;
-    if ($('#section-title')) $('#section-title').textContent = weekly ? 'Haftalık yayın akışı' : personal ? 'Kaydedilen animeler' : state.page === 'seasons' ? `${seasonLabel()} animeleri` : 'Sezonu keşfet';
+    if ($('#section-title')) $('#section-title').textContent = weekly ? 'Haftalık yayın akışı' : personal ? 'Kaydedilen animeler' : state.page === 'seasons' ? `${state.year} ${seasons[state.quarter]} animeleri` : 'Sezonu keşfet';
   }
 
   function renderAside() {
-    const schedule = $('#schedule-list');
-    if (schedule) {
-      const daily = state.schedule.filter(item => knownBroadcast(item) && item.day === state.day).sort((a, b) => a.time.localeCompare(b.time));
-      schedule.innerHTML = daily.slice(0, 3).map(item => `<article class="schedule-item">${art(item, 'schedule-art')}<div class="schedule-copy"><h4 class="schedule-title"><button type="button" class="title-button" data-action="detail" data-id="${item.id}">${escape(item.title)}</button></h4><div class="schedule-time">${escape(item.time)}</div><span class="episode-badge">Haftalık yayın</span>${item.broadcastLocal ? '' : '<small class="broadcast-note">Kaynak saati</small>'}</div>${reminderButton(item)}</article>`).join('');
-      if (daily.length > 3) schedule.innerHTML += `<button type="button" class="text-button" data-page="schedule">${daily.length} yayını takvimde gör ${icon('arrow-right')}</button>`;
-      if (!daily.length) schedule.innerHTML = state.scheduleLoading ? '<p class="aside-empty">Yayın takvimi yükleniyor…</p>' : state.scheduleError ? '<p class="aside-empty">Yayın takvimi alınamadı.</p><button type="button" class="text-button" data-action="retry" data-resource="schedule">Yeniden dene</button>' : '<p class="aside-empty">Bu gün için saat bilgisi bulunan yayın yok.</p>';
-    }
     const follow = $('#follow-list');
     if (follow) follow.innerHTML = savedItems().slice(0, 3).map(item => `<article class="follow-item">${art(item, 'follow-art')}<div class="follow-copy"><h4 class="follow-title"><button type="button" class="title-button" data-action="detail" data-id="${item.id}">${escape(item.title)}</button></h4><div class="follow-progress"><span>${progressText(item)}</span>${item.episodes ? `<span>${Math.round(countProgress(item) / item.episodes * 100)}%</span>` : ''}</div>${progressBar(item)}</div></article>`).join('') || '<p class="aside-empty">Listene eklediğin animeler burada görünecek.</p>';
     if ($('#weekday-tabs')) $('#weekday-tabs').innerHTML = shortDays.map((day, index) => `<button type="button" class="weekday-button${state.day === index ? ' active' : ''}" data-day="${index}" aria-pressed="${state.day === index}" aria-label="${escape(dateLabel(state.week[index]))} ${days[index]}">${day}</button>`).join('');
@@ -307,7 +403,7 @@
     if (!hero) return;
     const entries = heroItems();
     const item = currentHero();
-    hero.hidden = !item || !['discover', 'seasons'].includes(state.page);
+    hero.hidden = !item || state.page !== 'discover';
     hero.classList.remove('hero-atlas', 'hero-garden'); hero.classList.add('remote-hero');
     hero.style.setProperty('--hero-image', 'none'); hero.style.backgroundImage = 'none';
     if (!item) return;
@@ -364,7 +460,6 @@
       else if (error) messages.push(`<span>${escape(prefix)} alınamadı.${available ? ' Son alınan veriler gösteriliyor.' : ''}</span><button type="button" class="text-button" data-action="retry" data-resource="${schedulePage ? 'schedule' : 'catalog'}">Yeniden dene</button>`);
       else if (meta) messages.push(`<span>${meta.stale ? 'Önbellekteki veriler gösteriliyor · ' : ''}MyAnimeList / Tenrai${updatedAt(meta) ? ` · ${escape(updatedAt(meta))}` : ''}</span>`);
     }
-    if (!schedulePage && state.scheduleError) messages.push('<span>Yayın takvimi alınamadı.</span><button type="button" class="text-button" data-action="retry" data-resource="schedule">Takvimi yeniden yükle</button>');
     if (schedulePage && !state.scheduleLoading && !state.scheduleError) {
       const unknown = state.schedule.filter(item => item.airing && !knownBroadcast(item)).length;
       if (unknown) messages.push(`<span class="broadcast-note">${unknown} animenin yayın saati açıklanmadığı için takvimde gösterilmiyor.</span>`);
@@ -377,8 +472,16 @@
 
   function renderPage() {
     document.body.dataset.page = state.page;
-    const titles = { discover: seasonLabel(), seasons: 'Sezonlar', schedule: 'Yayın Takvimi', watchlist: 'Listem' };
-    const subtitles = { discover: 'Yeni hikâyeler, yeni favoriler.', seasons: 'MyAnimeList sezon kataloğunu keşfet.', schedule: `${weekLabel()} · Haftalık yayın saatleri.`, watchlist: 'Bu cihazdaki listen ve izleme ilerlemen.' };
+    const library = state.page === 'seasons' && !state.seasonsOpen;
+    document.body.dataset.seasonView = library ? 'library' : 'catalog';
+    if ($('.heading-block .eyebrow')) $('.heading-block .eyebrow').textContent = library ? 'ANİME ARŞİVİ' : 'SEZON REHBERİ';
+    if (!library) { stopSeasonPreviews(); if ($('#season-library-art')) $('#season-library-art').hidden = true; }
+    const titles = { discover: seasonLabel(), seasons: state.seasonsOpen ? `${state.year} ${seasons[state.quarter]}` : 'Sezon kütüphanesi', schedule: 'Yayın Takvimi', watchlist: 'Listem' };
+    const subtitles = { discover: 'Yeni hikâyeler, yeni favoriler.', seasons: state.seasonsOpen ? 'Bu sezondaki tüm animeleri keşfet.' : 'Her mevsimin ayrı bir hikâyesi var.', schedule: `${weekLabel()} · Haftalık yayın saatleri.`, watchlist: 'Bu cihazdaki listen ve izleme ilerlemen.' };
+    if ($('#season-library')) $('#season-library').hidden = !library;
+    if ($('#catalog-section')) $('#catalog-section').hidden = library;
+    if ($('#season-library-back')) $('#season-library-back').hidden = state.page !== 'seasons' || !state.seasonsOpen;
+    renderSeasonLibrary();
     if ($('#page-title')) $('#page-title').textContent = titles[state.page];
     if ($('#page-subtitle')) $('#page-subtitle').textContent = subtitles[state.page];
     document.querySelectorAll('#nav-items [data-page]').forEach(button => {
@@ -398,7 +501,8 @@
     if ($('#catalog-controls')) $('#catalog-controls').hidden = state.page === 'schedule';
     if ($('#format-tabs')) $('#format-tabs').hidden = state.page === 'watchlist';
     if ($('#promo-banner')) $('#promo-banner').hidden = state.page !== 'discover';
-    renderHero(); renderCatalog(); renderAside(); renderStatus();
+    renderHero(); if (!library) renderCatalog(); renderAside(); renderStatus();
+    if (library && $('#data-status')) $('#data-status').hidden = true;
     window.dispatchEvent(new CustomEvent('anime:viewrender'));
   }
 
@@ -473,12 +577,12 @@
   function toggleReminder(id) {
     if (!byId.has(id)) return;
     const had = state.reminders.has(id); if (had) state.reminders.delete(id); else state.reminders.add(id);
-    persist(); refresh(); toast(had ? 'Takip işareti kaldırıldı.' : 'Yerel takip işareti eklendi. Cihaz bildirimi gönderilmez.');
+    persist(); refresh(); toast(had ? 'Yayın hatırlatması kaldırıldı.' : 'Yayın hatırlatması seçildi. Bildirim iznini zil simgesinden açabilirsin.');
   }
   function setProgress(id, value) {
     const item = byId.get(id); if (!item) return;
     const progress = Math.min(item.episodes || 9999, Math.max(0, Math.floor(Number(value) || 0)));
-    state.progress[id] = progress; if (progress > 0) state.saved.add(id);
+    state.progress[id] = progress; if (progress > 0) { state.saved.add(id); state.tracking[id] = item.episodes && progress >= item.episodes ? 'completed' : 'watching'; }
     persist(); refresh(); toast(item.episodes && progress === item.episodes ? `${item.title} tamamlandı!` : `İzleme ilerlemesi: ${progressText(item)}.`);
   }
 
@@ -496,6 +600,7 @@
   }
 
   function openDetail(id) {
+    if (window.AnimeExperienceMounted && byId.has(id)) { window.dispatchEvent(new CustomEvent('anime:detail',{detail:byId.get(id)})); return; }
     const item = byId.get(id), dialog = $('#anime-dialog'); if (!item || !dialog) return;
     state.dialogId = id; renderDetail(item); dialog.setAttribute('aria-labelledby', 'dialog-title');
     if (!dialog.open) dialog.showModal();
@@ -503,21 +608,26 @@
 
   function changePage(page) {
     if (!['discover', 'seasons', 'schedule', 'watchlist'].includes(page)) return;
+    window.dispatchEvent(new CustomEvent('anime:navigate',{detail:{page}}));
     state.page = page; state.query = ''; state.genre = 'all'; state.limit = 5;
+    if (page === 'seasons') { state.seasonsOpen = false; state.libraryYear = state.year; }
+    try { history.replaceState(null, '', '#' + page); } catch (_) { /* Navigation also works without history access. */ }
     if ($('#search')) $('#search').value = '';
     updateGenres(); renderPage(); window.scrollTo({ top: 0, behavior: 'smooth' });
     if (page === 'schedule' && !state.scheduleMeta && !state.scheduleLoading && !state.scheduleError) loadSchedule();
+    if (page === 'discover' && (!state.catalogMeta || state.catalogKey !== selectedKey()) && !state.catalogLoading) loadSeason();
   }
   function clearFilters() {
     state.query = ''; state.genre = 'all'; state.format = 'all'; state.limit = Infinity;
     if ($('#search')) $('#search').value = ''; if ($('#genre')) $('#genre').value = 'all'; renderPage();
   }
   function stepSeason(delta) {
-    state.quarter += delta;
-    if (state.quarter < 0) { state.quarter = 3; state.year--; }
-    if (state.quarter > 3) { state.quarter = 0; state.year++; }
+    const index = state.year * 4 + state.quarter + delta;
+    const year = Math.floor(index / 4), quarter = ((index % 4) + 4) % 4;
+    if (year < libraryMinYear || year > libraryMaxYear) return;
+    if (state.page !== 'discover') { openSeason(year, quarter); return; }
+    state.year = year; state.quarter = quarter;
     state.limit = 5; state.hero = 0;
-    if (state.page === 'schedule' || state.page === 'watchlist') state.page = 'seasons';
     loadSeason();
   }
   function retry(resource) {
@@ -535,21 +645,32 @@
       $('#sort').addEventListener('change', event => { state.sort = event.target.value; renderCatalog(); });
     }
     if ($('#search')) {
-      $('#search').addEventListener('input', event => { state.query = event.target.value; state.limit = state.query.trim() ? Infinity : 5; renderCatalog(); });
-      $('#search').addEventListener('keydown', event => { if (event.key === 'Escape') { event.target.value = ''; state.query = ''; state.limit = 5; renderCatalog(); } });
+      $('#search').addEventListener('input', event => { state.query = event.target.value; state.limit = state.page === 'seasons' || state.query.trim() ? Infinity : 5; renderCatalog(); });
+      $('#search').addEventListener('keydown', event => { if (event.key === 'Escape') { event.target.value = ''; state.query = ''; state.limit = state.page === 'seasons' ? Infinity : 5; renderCatalog(); } });
     }
+    if ($('#library-year')) $('#library-year').addEventListener('change', event => changeLibraryYear(Number(event.target.value)));
     if ($('#hero-save')) $('#hero-save').addEventListener('click', () => { const item = currentHero(); if (item) toggleSave(item.id); });
     if ($('#hero-detail')) $('#hero-detail').addEventListener('click', () => { const item = currentHero(); if (item) openDetail(item.id); });
     if ($('#load-more')) $('#load-more').addEventListener('click', () => { state.limit += 5; renderCatalog(); });
     if ($('#season-prev')) $('#season-prev').addEventListener('click', () => stepSeason(-1));
     if ($('#season-next')) $('#season-next').addEventListener('click', () => stepSeason(1));
-    if ($('#refresh-data')) $('#refresh-data').addEventListener('click', () => { loadSeason(true); loadSchedule(true); });
+    if ($('#refresh-data')) $('#refresh-data').addEventListener('click', () => { if (state.page === 'schedule') loadSchedule(true); else loadSeason(true); });
     window.addEventListener('anime:bannerchange', event => { if (currentHero()?.malId === event.detail?.malId) renderHero(); });
     if ($('#profile-button')) {
       $('#profile-button').hidden = true;
       $('#profile-button').addEventListener('click', () => window.AnimeMembership?.openProfile?.());
     }
     if ($('.rail-brand')) $('.rail-brand').addEventListener('click', event => { event.preventDefault(); changePage('discover'); });
+    if ($('.nav-search')) $('.nav-search').addEventListener('click', event => {
+      if (state.page === 'seasons' && !state.seasonsOpen) {
+        event.preventDefault(); changePage('discover');
+        $('#search')?.scrollIntoView({block: 'center', behavior: 'smooth'}); $('#search')?.focus({preventScroll: true}); return;
+      }
+      if (state.page !== 'schedule') return;
+      event.preventDefault();
+      const input = $('#full-map-search');
+      input?.scrollIntoView({block: 'center', behavior: 'smooth'}); input?.focus({preventScroll: true});
+    });
     if ($('#dialog-close')) $('#dialog-close').addEventListener('click', () => $('#anime-dialog')?.close());
     if ($('#anime-dialog')) {
       $('#anime-dialog').addEventListener('close', () => { state.dialogId = null; });
@@ -567,6 +688,18 @@
     document.addEventListener('change', event => { const input = event.target.closest('[data-progress-id]'); if (input) setProgress(input.dataset.progressId, input.value); });
     document.addEventListener('click', event => {
       const button = event.target.closest('button'); if (!button || button.disabled) return;
+      if (button.dataset.librarySelectYear !== undefined) { changeLibraryYear(Number(button.dataset.librarySelectYear)); return; }
+      if (button.dataset.previewRetry !== undefined) {
+        const quarter = Number(button.dataset.previewRetry);
+        if (Number(button.dataset.previewYear) === state.libraryYear && Number.isInteger(quarter) && quarter >= 0 && quarter < 4) { ensureSeasonPreviews(state.libraryYear, quarter); renderSeasonLibrary(); }
+        return;
+      }
+      if (button.dataset.seasonYear !== undefined) { openSeason(Number(button.dataset.seasonYear), Number(button.dataset.seasonQuarter)); return; }
+      if (button.dataset.libraryYear !== undefined) { changeLibraryYear(state.libraryYear + Number(button.dataset.libraryYear)); return; }
+      if (button.hasAttribute('data-library-back')) { state.seasonsOpen = false; renderPage(); window.scrollTo({top: 0, behavior: 'smooth'}); return; }
+      if (button.dataset.mapWeek !== undefined) { state.weekOffset = Math.max(-4, Math.min(4, state.weekOffset + Number(button.dataset.mapWeek))); updateDates(); renderPage(); return; }
+      if (button.hasAttribute('data-map-today')) { state.weekOffset = 0; updateDates(); state.day = state.todayDay; renderPage(); return; }
+      if (button.dataset.mapFilter) { state.mapSaved = button.dataset.mapFilter === 'saved'; renderCatalog(); renderAside(); return; }
       if (button.dataset.page) { changePage(button.dataset.page); return; }
       if (button.dataset.format) { state.format = button.dataset.format; state.limit = Infinity; renderPage(); return; }
       if (button.dataset.view) { state.view = button.dataset.view; persist(); renderPage(); return; }
@@ -586,12 +719,26 @@
         case 'show-watchlist': $('#anime-dialog')?.close(); changePage('watchlist'); break;
       }
     });
+    document.addEventListener('input', event => {
+      if (!event.target.matches('[data-map-search]')) return;
+      state.mapQuery = event.target.value; renderCatalog(); renderAside();
+    });
+    const hashPage = () => {
+      const page = location.hash.slice(1);
+      if (['discover', 'seasons', 'schedule', 'watchlist'].includes(page) && page !== state.page) changePage(page);
+    };
+    window.addEventListener('hashchange', hashPage);
+    const initialPage = location.hash.slice(1);
+    if (['discover', 'seasons', 'schedule', 'watchlist'].includes(initialPage)) state.page = initialPage;
     updateGenres(); renderPage();
-    loadSeason(); loadSchedule();
-    setInterval(() => { const previous = state.todayKey; updateDates(); if (previous !== state.todayKey) { renderPage(); loadSchedule(); } }, 60000);
+    if (state.page !== 'seasons') loadSeason();
+    if (state.page === 'schedule') loadSchedule();
+    setInterval(() => { const previous = state.todayKey; updateDates(); if (previous !== state.todayKey) { renderPage(); if (state.page === 'schedule') loadSchedule(); } else { if (state.page === 'schedule') renderCatalog(); renderAside(); } }, 60000);
     window.animeTakvimi = {
-      getState: () => ({ page: state.page, season: selectedKey(), saved: [...state.saved], reminders: [...state.reminders], progress: { ...state.progress }, view: state.view, catalogCount: state.catalog.length, scheduleCount: state.schedule.length, accountScope }),
-      getLibrarySnapshot, setAccountScope, setGuestScope, replaceLibrarySnapshot, refreshView: refresh
+      getState: () => ({ page: state.page, season: selectedKey(), saved: [...state.saved], reminders: [...state.reminders], progress: { ...state.progress }, view: state.view, catalogCount: state.catalog.length, scheduleCount: state.schedule.length, libraryYear: state.libraryYear, seasonsOpen: state.seasonsOpen, format: state.format, accountScope }),
+      getLibrarySnapshot, setAccountScope, setGuestScope, replaceLibrarySnapshot, refreshView: refresh,
+      registerItems: register, openDetail, navigate:changePage, loadSchedule,
+      getExperienceSnapshot: () => ({page:state.page, accountScope, library:getLibrarySnapshot(), catalog:state.catalog.slice(), schedule:state.schedule.slice(), loading:state.catalogLoading, error:state.catalogError})
     };
   }
 

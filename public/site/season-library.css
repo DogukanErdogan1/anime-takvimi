@@ -1,0 +1,151 @@
+/* Image-led season library. All artwork is supplied by the catalogue API. */
+body[data-page="seasons"] .site-masthead { min-height: 0; padding-bottom: 29px; }
+body[data-page="seasons"] .site-masthead .page-header { padding-top: 26px; }
+body[data-page="seasons"] .site-masthead h1 { font-size: clamp(52px, 5.3vw, 80px); }
+body[data-page="seasons"] .site-masthead .hero,
+body[data-page="seasons"] .masthead-actions,
+body[data-page="seasons"] .library-overview { display: none; }
+body[data-page="seasons"] .site-masthead .page-header p { font-size: clamp(20px, 1.9vw, 27px); }
+
+/* Optional header collage uses the same real catalogue posters as the cards. */
+.season-library-art { position: absolute; top: 78px; right: 0; bottom: 0; z-index: 0; width: 48%; overflow: hidden; opacity: .48; pointer-events: none; }
+.season-library-art::after { content: ''; position: absolute; inset: 0; z-index: 2; background: linear-gradient(90deg, #132532 0%, #13253240 60%, #13253220), linear-gradient(0deg, #13253265, transparent 65%); }
+.season-library-art img { position: absolute; top: -18%; width: 34%; height: 145%; object-fit: cover; object-position: center 22%; transform: rotate(12deg); filter: saturate(.65); }
+.season-library-art img:nth-child(1) { left: 6%; }
+.season-library-art img:nth-child(2) { left: 38%; }
+.season-library-art img:nth-child(3) { left: 70%; }
+
+#season-library { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px 24px; padding: 25px 0 24px; }
+.season-library-heading { min-width: 0; }
+.season-library-heading h2 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: clamp(42px, 4.4vw, 64px); font-weight: 500; line-height: 1.08; letter-spacing: -.05em; }
+.season-library-heading p { margin: 7px 0 0; color: var(--muted); font-family: var(--serif); font-size: 19px; line-height: 1.5; }
+.season-year-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; padding-bottom: 3px; }
+.season-year-controls .icon-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 42px; width: 42px; height: 42px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: transparent; }
+.season-year-controls .icon-button .icon { width: 18px; height: 18px; }
+.season-year-controls .icon-button:hover { border-color: var(--coral); background: #f9e9e1; color: var(--coral-dark); }
+.season-year-controls label { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: #ffffff35; font-size: 12px; }
+.season-year-controls select { min-width: 78px; margin: 0; padding: 6px 4px; border: 0; border-radius: 4px; color: var(--ink); background: transparent; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
+
+.season-year-rail { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; gap: 18px; width: 100%; min-width: 0; margin: -4px 0 -3px; }
+.season-year-rail button { position: relative; display: flex; align-items: center; justify-content: center; gap: 18px; min-width: 0; min-height: 59px; margin: 0; padding: 5px 0 9px; border: 0; border-radius: 0; color: #8a8b85; background: transparent; font-family: var(--serif); font-size: 25px; font-weight: 400; line-height: 1.15; letter-spacing: -.04em; cursor: pointer; }
+.season-year-rail button::before,
+.season-year-rail button::after { content: ''; display: block; flex: 1 1 auto; min-width: 8px; height: 1px; background: var(--line); }
+.season-year-rail button:hover { color: var(--coral-dark); }
+.season-year-rail button.is-active,
+.season-year-rail button[aria-pressed="true"] { color: var(--ink); background: linear-gradient(var(--coral), var(--coral)) no-repeat center calc(100% - 3px) / 70px 2px; font-size: 38px; font-weight: 500; }
+
+.season-shelves { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 19px; }
+.season-shelf { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: #fffdf8; text-align: left; cursor: pointer; transition: transform .18s, border-color .18s, box-shadow .18s; }
+.season-shelf:hover { transform: translateY(-4px); border-color: #d8a593; box-shadow: 0 10px 27px #11222f10; }
+.season-shelf:active { transform: translateY(-1px); }
+.season-shelf-current { border-color: var(--coral); box-shadow: 0 0 0 1px #f16f5b16; }
+.season-shelf-current:hover { border-color: var(--coral-dark); }
+.season-shelf-art { position: relative; isolation: isolate; display: block; height: 280px; padding: 0; overflow: hidden; border-bottom: 1px solid #11222f0a; background: #e6e3da; }
+.season-shelf-art::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, #11222f00, #11222f05 35%, #11222f45); pointer-events: none; }
+.season-shelf-winter .season-shelf-art { background: #e1e6e6; }
+.season-shelf-spring .season-shelf-art { background: #e4e6da; }
+.season-shelf-summer .season-shelf-art { background: #eee4d3; }
+.season-shelf-fall .season-shelf-art { background: #e9ddd5; }
+.season-shelf-symbol,
+.season-shelf-kicker { display: none; }
+.season-poster-backdrop { position: absolute; inset: -10px; z-index: 0; overflow: hidden; }
+.season-poster-backdrop img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; filter: blur(5px) saturate(.8) brightness(.69); transform: scale(1.04); }
+.season-poster-stack { position: absolute; inset: 0; z-index: 2; display: block; }
+.season-preview-poster,
+.season-preview-poster.remote-art { position: absolute; display: block; width: 42%; max-width: 126px; height: auto; aspect-ratio: 5 / 7; overflow: hidden; border: 2px solid #fff9; border-radius: 2px 2px 0 0; background: #e8e4dc; box-shadow: 0 5px 18px #07151e66; }
+.season-preview-poster img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 24%; }
+.season-preview-poster.poster-0 { left: 4%; bottom: 0; z-index: 1; transform: rotate(-3deg); transform-origin: center bottom; }
+.season-preview-poster.poster-1 { left: 50%; bottom: 0; z-index: 3; width: 50%; max-width: 150px; transform: translateX(-50%); }
+.season-preview-poster.poster-2 { right: 4%; bottom: 0; z-index: 2; transform: rotate(3deg); transform-origin: center bottom; }
+.season-preview-poster .image-placeholder { justify-content: center; padding: 9px; color: #6d756e; background: #e8e4dc; font-size: 10px; line-height: 1.4; }
+.season-preview-poster .image-placeholder .icon { width: 23px; height: 23px; }
+.season-current-badge { position: absolute; top: 13px; right: 13px; z-index: 5; padding: 7px 10px; border-radius: 8px; color: #fff; background: var(--coral); box-shadow: 0 2px 10px #11222f14; font-family: var(--sans); font-size: 9px; font-weight: 650; line-height: 1.35; letter-spacing: .015em; }
+.season-preview-state { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; margin: 0; padding: 25px; color: #67716b; background: #f5f1e9e8; font-family: var(--sans); font-size: 12px; line-height: 1.6; text-align: center; }
+.season-shelf-copy { display: block; padding: 21px 20px 0; }
+.season-shelf-copy > small { display: block; margin: 0; color: var(--muted); font-family: var(--serif); font-size: 11px; font-weight: 500; line-height: 1.5; letter-spacing: .065em; }
+.season-shelf-copy h3,
+.season-shelf-title { display: block; margin: 7px 0 0; color: var(--ink); font-family: var(--serif); font-size: clamp(27px, 2.55vw, 37px); font-weight: 500; line-height: 1.15; letter-spacing: -.05em; }
+.season-shelf .season-shelf-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 20px 0; padding: 13px 0 16px; border-top: 1px solid var(--line); color: var(--ink); font-family: var(--serif); font-size: 14px; line-height: 1.4; }
+.season-shelf .season-shelf-footer .icon { width: 35px; height: 35px; padding: 8px; border: 1px solid #aab3b6; border-radius: 50%; color: var(--ink); transition: transform .18s, border-color .18s; }
+.season-shelf:hover .season-shelf-footer .icon { transform: translateX(2px); border-color: var(--coral); color: var(--coral-dark); }
+.season-shelf:hover .season-shelf-footer { color: var(--coral-dark); }
+.season-library-back.text-button { display: inline-flex; align-items: center; gap: 9px; min-height: 39px; margin: 0 0 14px; padding: 6px 0; color: var(--coral-dark); font-size: 12px; }
+.season-library-back.text-button .icon { width: 16px; height: 16px; }
+.season-library-back.text-button:hover { color: var(--ink); }
+.season-shelf:focus-visible,
+.season-year-controls :is(button, select):focus-visible,
+.season-year-rail button:focus-visible,
+.season-library-back:focus-visible { outline: 2px solid var(--coral-dark); outline-offset: 4px; }
+body[data-page="admin"] #season-library { display: none; }
+
+@media (max-width: 1100px) {
+  .season-shelves { gap: 15px; }
+  .season-shelf-art { height: 250px; }
+  .season-shelf-copy { padding: 19px 15px 0; }
+  .season-shelf-copy h3, .season-shelf-title { font-size: 28px; }
+  .season-shelf .season-shelf-footer { margin: 17px 15px 0; font-size: 12px; }
+  .season-current-badge { top: 10px; right: 10px; padding: 6px 8px; font-size: 8px; }
+  .season-year-rail { gap: 12px; }
+  .season-year-rail button { gap: 12px; }
+}
+@media (max-width: 980px) {
+  .season-shelves { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .season-shelf-art { height: 280px; }
+  .season-shelf-copy { padding: 21px 22px 0; }
+  .season-shelf-copy h3, .season-shelf-title { font-size: 35px; }
+  .season-shelf .season-shelf-footer { margin: 19px 22px 0; font-size: 14px; }
+  .season-current-badge { top: 13px; right: 13px; padding: 7px 10px; font-size: 9px; }
+  .season-library-art { top: 120px; width: 48%; opacity: .32; }
+}
+@media (max-width: 640px) {
+  body[data-page="seasons"] .site-masthead h1 { font-size: clamp(40px, 8.5vw, 53px); }
+  body[data-page="seasons"] .site-masthead .page-header p { max-width: 300px; font-size: 20px; }
+  .season-library-art { width: 55%; opacity: .2; }
+  #season-library { grid-template-columns: minmax(0, 1fr); gap: 18px; padding-top: 24px; }
+  .season-library-heading h2 { font-size: 43px; }
+  .season-library-heading p { margin-top: 7px; font-size: 16px; }
+  .season-year-controls { justify-content: flex-start; padding-bottom: 0; }
+  .season-year-controls .icon-button { flex-basis: 40px; width: 40px; height: 40px; }
+  .season-year-controls label { min-height: 40px; }
+  .season-year-rail { gap: 8px; margin: -1px 0 -2px; }
+  .season-year-rail button { gap: 7px; min-height: 52px; font-size: 20px; }
+  .season-year-rail button::before, .season-year-rail button::after { min-width: 3px; }
+  .season-year-rail button.is-active, .season-year-rail button[aria-pressed="true"] { background-size: 52px 2px; font-size: 29px; }
+  .season-shelves { gap: 15px; }
+  .season-shelf-art { height: 235px; }
+  .season-shelf-copy { padding: 18px 15px 0; }
+  .season-shelf-copy > small { font-size: 9px; }
+  .season-shelf-copy h3, .season-shelf-title { font-size: 28px; }
+  .season-shelf .season-shelf-footer { margin: 17px 15px 0; padding-bottom: 15px; font-size: 12px; }
+  .season-shelf .season-shelf-footer .icon { width: 30px; height: 30px; padding: 7px; }
+  .season-current-badge { top: 9px; right: 9px; padding: 6px 7px; border-radius: 6px; font-size: 8px; }
+  .season-library-back.text-button { margin-bottom: 10px; font-size: 11px; }
+}
+@media (max-width: 440px) {
+  .season-shelves { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .season-shelf-art { height: 280px; }
+  .season-shelf-copy { padding: 21px 20px 0; }
+  .season-shelf-copy > small { font-size: 11px; }
+  .season-shelf-copy h3, .season-shelf-title { font-size: 35px; }
+  .season-shelf .season-shelf-footer { margin: 19px 20px 0; padding-bottom: 17px; font-size: 14px; }
+  .season-shelf .season-shelf-footer .icon { width: 35px; height: 35px; padding: 8px; }
+  .season-current-badge { top: 13px; right: 13px; padding: 7px 10px; font-size: 9px; }
+  .season-year-rail { gap: 4px; }
+  .season-year-rail button { gap: 4px; font-size: 18px; }
+  .season-year-rail button.is-active, .season-year-rail button[aria-pressed="true"] { background-size: 45px 2px; font-size: 26px; }
+}
+.season-shelf-copy > .season-shelf-footer { margin-left: 0; margin-right: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .season-shelf, .season-shelf .season-shelf-footer .icon { transition: none; }
+  .season-shelf:hover, .season-shelf:active, .season-shelf:hover .season-shelf-footer .icon { transform: none; }
+}
+
+.season-shelf-wrap { display: flex; flex-direction: column; min-width: 0; }
+.season-shelf-wrap > .season-shelf { flex: 1; }
+.season-preview-retry { align-self: flex-start; margin-top: 9px; color: var(--coral-dark); font-size: 12px; }
+.season-preview-state { flex-direction: column; gap: 10px; }
+.season-preview-state .icon { width: 23px; height: 23px; }
+.season-cache-badge { position: absolute; z-index: 5; left: 10px; bottom: 9px; padding: 3px 6px; border-radius: 4px; font-size: 9px; color: #fff; background: #11222fba; }
+.season-poster-stack[data-poster-count="1"] .poster-0 { left: 50%; right: auto; width: 50%; max-width: 150px; transform: translateX(-50%); }
+.season-poster-stack[data-poster-count="2"] .poster-0 { left: 5%; }
+.season-poster-stack[data-poster-count="2"] .poster-1 { left: auto; right: 5%; transform: rotate(3deg); }
