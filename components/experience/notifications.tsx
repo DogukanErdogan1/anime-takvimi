@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect, useMemo, useRef, useState} from "react";
-import {Bell, BellOff, BellRing, Check, Download, Moon, Sun, X} from "lucide-react";
+import {Bell, BellOff, BellRing, Check, Download, X} from "lucide-react";
 import type {ExperienceSnapshot, LibraryChange} from "./types";
 import {broadcastMinute, dueReminders, notificationStorageKey, pruneDeliveryKeys, todayFollowed, turkeyClock} from "./reminder-logic";
 import "./notifications.css";
@@ -12,7 +12,6 @@ type InstallPromptEvent = Event & {
 };
 type Preference = {scope: string; enabled: boolean};
 type Permission = NotificationPermission | "unsupported";
-const THEME_KEY = "anime-takvimi-theme-v1";
 
 function currentPermission(): Permission {
   return typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported";
@@ -40,7 +39,6 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
   const installPrompt = useRef<InstallPromptEvent | null>(null);
   const [permission, setPermission] = useState<Permission>("unsupported");
   const [preference, setPreference] = useState<Preference>({scope: "", enabled: false});
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [open, setOpen] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [promptReady, setPromptReady] = useState(false);
@@ -81,12 +79,6 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
 
   useEffect(() => {
     setPermission(currentPermission());
-    let initial: "light" | "dark" = "light";
-    try {
-      const stored = localStorage.getItem(THEME_KEY);
-      initial = stored === "dark" || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-    } catch { /* Keep the readable default. */ }
-    setTheme(initial); document.documentElement.dataset.theme = initial;
     const syncPermission = () => setPermission(currentPermission());
     window.addEventListener("focus", syncPermission);
     document.addEventListener("visibilitychange", syncPermission);
@@ -178,12 +170,6 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
     return () => {disposed = true; window.clearInterval(timer);};
   }, [enabled, permission, scope, snapshot.ready, snapshot.libraryLoading, snapshot.blocked, items, snapshot.library.reminders]);
 
-  function toggleTheme() {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next); document.documentElement.dataset.theme = next;
-    try { localStorage.setItem(THEME_KEY, next); } catch {}
-  }
-
   async function enableNotifications() {
     const requestedScope = scope, requestedEpoch = accountEpoch.current.value;
     if (enabled) {savePreference(false); setFeedback("Cihaz hatırlatmaları kapatıldı."); return;}
@@ -214,8 +200,7 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
 
   const close = () => {setOpen(false); trigger.current?.focus();};
   return <>
-    <div className="experience-controls" aria-label="Görünüm ve hatırlatmalar">
-      <button type="button" className="experience-control experience-theme-shortcut" onClick={toggleTheme} aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"} title={theme === "dark" ? "Açık tema" : "Koyu tema"}>{theme === "dark" ? <Sun size={18}/> : <Moon size={18}/>}</button>
+    <div className="experience-controls" aria-label="Hatırlatmalar">
       <button ref={trigger} type="button" className="experience-control experience-bell" onClick={() => setOpen(true)} aria-label={`Bildirimler${today.length ? `, bugün ${today.length} yayın` : ""}`} aria-haspopup="dialog" title="Bildirimler"><Bell size={19}/>{today.length > 0 && <span className="experience-notification-dot" aria-hidden="true"/>}</button>
     </div>
     <dialog ref={dialog} className="experience-reminders" aria-labelledby="experience-reminders-title" onCancel={close} onClose={() => setOpen(false)} onClick={event => {if (event.target === event.currentTarget) close();}}>
@@ -243,7 +228,6 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
           {feedback && <p className="experience-notification-help" role="status">{feedback}</p>}
           <small className="experience-notification-footnote">Saatler haftalık yayın planıdır; sonradan değişebilir. Site kapalıyken bildirim gönderilmez.</small>
         </section>
-        <section className="experience-theme-setting"><Moon size={20}/><div><h3 id="experience-theme-label">Koyu tema</h3><p>Daha rahat bir gece deneyimi.</p></div><button type="button" role="switch" aria-checked={theme === "dark"} aria-labelledby="experience-theme-label" className="experience-theme-switch" onClick={toggleTheme}><span aria-hidden="true"/></button></section>
         <section className="experience-install"><span className="experience-install-icon">{installed ? <Check size={20}/> : <Download size={20}/>}</span><div><h3>{installed ? "Anime Takvimi hep yanında" : "Her zaman yanında."}</h3><p>{installed ? "Uygulama bu cihazda kullanıma hazır." : "Anime Takvimi’ni ana ekranına ekle."}</p></div>{!installed && <button type="button" onClick={() => {void install();}} aria-expanded={installHelp}>{promptReady ? "Uygulamayı ekle" : "Nasıl eklerim?"}</button>}
           {installHelp && <p className="experience-install-help">Telefonda tarayıcının <strong>Paylaş</strong> veya <strong>⋮</strong> menüsünden <strong>Ana ekrana ekle</strong> seçeneğini kullan. Bilgisayarda adres çubuğundaki yükleme simgesine veya tarayıcı menüsündeki uygulama yükleme seçeneğine bak. Seçenek görünmüyorsa siteyi yer imlerine ekleyebilirsin.</p>}
         </section>

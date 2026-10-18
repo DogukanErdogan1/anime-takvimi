@@ -1,6 +1,6 @@
 export type WatchStatus = 'watching' | 'planned' | 'completed' | 'dropped';
 export type Anime = {
-  id: string; malId: number; title: string; original?: string; image: string | null;
+  id: string; malId: number; title: string; original?: string; synonyms?: string[]; image: string | null;
   genres: string[]; episodes: number | null; rating: number | null; studio: string;
   summary: string; malUrl: string | null; format: string; members: number;
   day: number | null; time: string | null; broadcastLocal: boolean; airing: boolean;
@@ -16,7 +16,7 @@ export type Library = {
 };
 export type Account = {
   authenticated: boolean; registered: boolean;
-  user?: {id: string; displayName: string; email?: string; role: 'admin'|'member'; status: 'active'|'suspended'; avatarUrl?: string|null; createdAt?: string};
+  user?: {id: string; displayName: string; email?: string; role: 'admin'|'member'; status: 'active'|'suspended'; avatarUrl?: string|null; avatarFrame?:string|null; createdAt?: string};
 };
 export type ExperienceSnapshot = {
   ready: boolean; page: string; catalog: Anime[]; schedule: Anime[];
@@ -46,6 +46,7 @@ declare global {
     };
     AnimeData?: {
       safeImage: (value:unknown) => string|null;
+      searchAnime: (query:string,options?:{signal?:AbortSignal}) => Promise<{anime:Anime[];fetchedAt:number;cached:boolean;source:string}>;
       getDetails: (malId:number,options?:{signal?:AbortSignal}) => Promise<AnimeDetails>;
     };
     AnimeBanners?: {resolve: (id:number) => Promise<string|null>; safeBanner: (value:unknown,id?:number) => string|null};

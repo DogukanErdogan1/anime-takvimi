@@ -3,6 +3,11 @@ import "./globals.css";
 import "../public/site/schedule-map.css";
 import "../public/site/season-library.css";
 import "../components/experience/experience.css";
+import "../components/experience/theme-picker.css";
+import "../components/experience/themes.css";
+import "../components/experience/avatar-frame-picker.css";
+import "../components/experience/avatar-frame.css";
+import "../components/experience/catalog-contrast.css";
 import ThemePreference from '@/components/experience/theme-preference';
 
 export const metadata: Metadata = {
@@ -24,6 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
+      <head><link rel="preload" href="/site/fonts/space-grotesk-variable.ttf" as="font" type="font/ttf" crossOrigin="anonymous" /></head>
       <body><ThemePreference/>{children}</body>
     </html>
   );

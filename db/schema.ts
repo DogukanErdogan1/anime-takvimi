@@ -101,3 +101,10 @@ export const memberCovers = sqliteTable('member_covers', {
   check('cover_type_check',sql`${table.contentType} IN ('image/png','image/jpeg','image/webp')`),
   check('cover_key_check',sql`length(${table.objectKey}) = 107 AND substr(${table.objectKey},1,6) = 'cover/'`),
 ]);
+export const memberProfileFrames = sqliteTable('member_profile_frames', {
+  userId:text('user_id').primaryKey().references(()=>members.id),
+  frameId:text('frame_id').notNull().default('none'),
+  updatedAt:text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+},table=>[
+  check('profile_frame_id_check',sql`${table.frameId} IN ('none','platin','yorunge','editor','kirik-halo','murekkep','panel','kristal','krom-akis','defne','krizantem','koi','yildiz-muhru')`),
+]);

@@ -1,0 +1,38 @@
+.at-frame-overlay{position:fixed;inset:0;background:#071018aa;backdrop-filter:blur(5px);z-index:1200;animation:at-frame-fade .18s ease}
+.at-frame-dialog{position:fixed;z-index:1201;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(790px,calc(100vw - 32px));max-height:min(860px,calc(100dvh - 32px));display:flex;flex-direction:column;overflow:hidden;background:var(--theme-surface,var(--paper,#f7f5ef));color:var(--ink,#172b37);border:1px solid var(--line,#d9dcd7);border-radius:20px;box-shadow:0 30px 100px #0006;font-family:var(--sans,'Segoe UI',sans-serif);animation:at-frame-fade .18s ease}
+.at-frame-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:25px 28px 20px;border-bottom:1px solid var(--line)}
+.at-frame-overline{display:block;margin-bottom:7px;font-size:9px;letter-spacing:.17em;font-weight:700;color:var(--coral)}
+.at-frame-heading h2{margin:0;color:var(--ink);font:600 26px/1.2 var(--display,'Segoe UI',sans-serif);letter-spacing:-.035em}
+.at-frame-heading p{margin:9px 0 0;max-width:510px;color:var(--muted);font-size:12px;line-height:1.6}
+.at-frame-close{display:grid;place-items:center;flex-shrink:0;width:32px;height:32px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);cursor:pointer}
+.at-frame-scroll{overflow-y:auto;overscroll-behavior:contain;padding:22px 28px 25px}
+.at-frame-preview{display:flex;align-items:center;gap:38px;padding:32px 34px;background:color-mix(in srgb,var(--paper) 78%,var(--coral) 4%);border:1px solid var(--line);border-radius:14px;min-height:160px;margin-bottom:22px}
+.at-frame-avatar{position:relative;display:grid;place-items:center;isolation:isolate;flex:none;width:96px;height:96px;border-radius:50%;background:var(--theme-nav,#142b39);color:#fff;font:600 29px/1 var(--display,'Segoe UI',sans-serif);user-select:none}
+.at-frame-avatar>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;z-index:1}
+.at-frame-avatar>span:not(.at-avatar-frame){font:inherit}
+.at-frame-preview-copy{min-width:0;display:flex;flex-direction:column;gap:7px}
+.at-frame-preview-copy>span{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}
+.at-frame-preview-copy>strong{font:600 24px/1.15 var(--display,'Segoe UI',sans-serif);letter-spacing:-.025em;overflow-wrap:anywhere}
+.at-frame-preview-copy>small{font-size:11px;color:var(--muted);line-height:1.6}
+.at-frame-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.at-frame-choice{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;min-width:0;min-height:148px;padding:24px 12px 13px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease}
+.at-frame-choice:hover{border-color:color-mix(in srgb,var(--coral) 70%,var(--line));background:color-mix(in srgb,var(--coral) 5%,var(--paper))}
+.at-frame-choice.is-selected{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 8%,var(--paper));box-shadow:inset 0 0 0 1px var(--coral)}
+.at-frame-choice .at-frame-avatar{width:68px;height:68px;font-size:21px}
+.at-frame-choice-name{font-size:11px;font-weight:600;line-height:1.2;text-align:center;min-height:14px}
+.at-frame-choice-check{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--coral);color:var(--theme-on-accent,#fff)}
+.at-frame-choice:focus-visible,.at-frame-close:focus-visible,.at-frame-footer button:focus-visible{outline:2px solid var(--coral);outline-offset:3px}
+.at-frame-feedback{margin:0;padding:0 28px 16px;color:var(--coral-dark,var(--coral));font-size:12px;line-height:1.5}
+.at-frame-footer{display:flex;align-items:center;justify-content:flex-end;gap:13px;padding:17px 28px;border-top:1px solid var(--line);background:var(--theme-surface,var(--paper));flex-shrink:0}
+.at-frame-footer>span{margin-right:auto;color:var(--muted);font-size:10px;line-height:1.5}
+.at-frame-cancel,.at-frame-save{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:10px 17px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.at-frame-cancel{background:transparent;color:var(--ink)}
+.at-frame-save{background:var(--coral);color:var(--theme-on-accent,#fff);border-color:var(--coral)}
+.at-frame-save:not(:disabled):hover{background:var(--coral-dark);border-color:var(--coral-dark)}
+.at-frame-dialog button:disabled{opacity:.55;cursor:not-allowed}
+.at-profile-actions{flex-wrap:wrap}
+.at-profile-actions>.at-frame-trigger{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+@keyframes at-frame-fade{from{opacity:0}to{opacity:1}}
+@media(max-width:680px){.at-frame-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px);border-radius:15px}.at-frame-heading{padding:20px 19px 16px}.at-frame-heading h2{font-size:22px}.at-frame-heading p{font-size:11px}.at-frame-scroll{padding:19px}.at-frame-preview{padding:26px 27px;gap:32px;min-height:136px;margin-bottom:18px}.at-frame-preview .at-frame-avatar{width:82px;height:82px;font-size:25px}.at-frame-preview-copy>strong{font-size:21px}.at-frame-preview-copy>small{font-size:10px}.at-frame-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.at-frame-choice{min-height:138px;padding:24px 8px 13px;gap:22px}.at-frame-choice .at-frame-avatar{width:59px;height:59px;font-size:19px}.at-frame-choice-name{font-size:10px}.at-frame-footer{padding:15px 19px;gap:9px}.at-frame-footer>span{font-size:9px;max-width:120px}.at-frame-feedback{padding:0 19px 15px}.at-frame-cancel,.at-frame-save{font-size:10px;padding:9px 13px}}
+@media(max-width:360px){.at-frame-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.at-frame-footer>span{display:none}.at-frame-preview{gap:20px;padding-inline:18px}}
+@media(prefers-reduced-motion:reduce){.at-frame-overlay,.at-frame-dialog{animation:none}.at-frame-choice{transition:none}}

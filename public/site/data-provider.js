@@ -244,6 +244,45 @@
     }
   }
 
+  const searchCache = new Map();
+  const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+  async function searchAnime(value, {signal} = {}) {
+    checkAbort(signal);
+    const query = text(value, 300).normalize('NFC').replace(/\s+/g, ' ');
+    const source = 'MyAnimeList / Tenrai';
+    if (query.length < 2) return {anime: [], fetchedAt: Date.now(), cached: false, source};
+    const key = query.toLowerCase();
+    const cached = searchCache.get(key);
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity;
+    if (cached && age >= 0 && age < SEARCH_CACHE_TTL) {
+      searchCache.delete(key); searchCache.set(key, cached);
+      checkAbort(signal);
+      return {...cached, anime: cached.anime.slice(), cached: true};
+    }
+    try {
+      // Keep the service's relevance order and retrieve only the suggestion page.
+      const response = await request(`/anime?sfw&q=${encodeURIComponent(query)}&limit=8&page=1`, signal);
+      checkAbort(signal);
+      if (!response || !Array.isArray(response.data)) throw new Error('Veri servisinden beklenmeyen bir yanıt geldi.');
+      const anime = [], ids = new Set();
+      for (const raw of response.data) {
+        const item = normalize(raw);
+        if (!item || ids.has(item.id)) continue;
+        ids.add(item.id); anime.push(item);
+        if (anime.length === 8) break;
+      }
+      checkAbort(signal);
+      const result = {anime, fetchedAt: Date.now(), cached: false, source};
+      searchCache.delete(key); searchCache.set(key, result);
+      while (searchCache.size > 50) searchCache.delete(searchCache.keys().next().value);
+      return {...result, anime: anime.slice()};
+    } catch (error) {
+      checkAbort(signal);
+      if (error.name === 'AbortError' || error.status) throw error;
+      throw new Error(error.message && error.message !== 'Failed to fetch' ? error.message : 'Anime aramasına bağlanılamadı. Tekrar deneyebilirsin.');
+    }
+  }
+
   const detailCache = new Map();
   async function getDetails(malId, {signal} = {}) {
     checkAbort(signal);
@@ -277,6 +316,7 @@
       return seasonPreview(year, season, options);
     },
     getSchedule(options = {}) { return load('schedules', '/schedules?sfw', options); },
-    getDetails
+    getDetails,
+    searchAnime
   });
 })();

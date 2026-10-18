@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { getChatGPTUser, chatGPTSignInPath, chatGPTSignOutPath } from '@/app/chatgpt-auth';
 import { MembershipError, createMembershipService } from './membership.mjs';
 import { createAvatarService } from './avatar.mjs';
+import { createProfileFrameService } from './profile-frame.mjs';
 export function jsonResponse(value: unknown, status = 200) {
   return Response.json(value, {status, headers: {'Cache-Control': 'no-store', 'Vary': 'Cookie', 'X-Content-Type-Options': 'nosniff'}});
 }
@@ -23,15 +24,16 @@ export async function accountResponse() {
   if (!identity) return jsonResponse(accountLinks({authenticated: false, registered: false}));
   const {service} = await membershipContext();
   const account = await service.account(identity);
-  if (account.registered && account.user?.status === 'active' && env.BUCKET) {
+  if (account.registered && account.user?.status === 'active') {
     let avatarUrl = null;
-    try { avatarUrl = await createAvatarService(env.DB,env.BUCKET).url(identity); }
+    try { if (env.BUCKET) avatarUrl = await createAvatarService(env.DB,env.BUCKET).url(identity); }
     catch (error) {
       // Accounts remain readable while an earlier deployment awaits its migration.
       const message = error instanceof Error ? error.message : '';
       if (!/no such table: member_avatars/i.test(message)) throw error;
     }
-    return jsonResponse(accountLinks({...account,user:{...account.user,avatarUrl}}));
+    const avatarFrame = await createProfileFrameService(env.DB).ownFrame(identity);
+    return jsonResponse(accountLinks({...account,user:{...account.user,avatarUrl,avatarFrame}}));
   }
   return jsonResponse(accountLinks(account));
 }

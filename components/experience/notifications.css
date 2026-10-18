@@ -10,7 +10,7 @@
 .experience-reminders-inner{display:flex;flex-direction:column;min-height:100%;padding:31px 28px 25px;box-sizing:border-box}
 .experience-reminders-header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:30px}
 .experience-small-kicker{font-size:9px;letter-spacing:2px;font-weight:800;color:var(--coral-dark,#d6533c)}
-.experience-reminders-header h2{font-family:var(--serif,Georgia,serif);font-size:32px;font-weight:700;line-height:1.2;margin:8px 0 0}
+.experience-reminders-header h2{font-family:var(--serif,'Space Grotesk','Segoe UI',Arial,sans-serif);font-size:32px;font-weight:700;line-height:1.2;margin:8px 0 0}
 .experience-sheet-close{display:grid;place-items:center;flex:0 0 34px;height:34px;padding:0;border:1px solid var(--line,#deded8);border-radius:50%;background:transparent;color:var(--ink,#142b39);cursor:pointer}
 .experience-reminder-date{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:11px;color:var(--muted,#717575)}
 .experience-reminder-date strong{font-size:12px;color:var(--ink,#142b39);margin-right:auto}
@@ -28,7 +28,7 @@
 .experience-reminder-toggle:disabled{opacity:.45;cursor:default}
 .experience-reminder-empty{display:flex;align-items:center;flex-direction:column;text-align:center;padding:30px 20px;color:var(--muted,#717575);border-bottom:1px solid var(--line,#deded8)}
 .experience-reminder-empty>svg{color:var(--coral,#f16f5b);margin-bottom:14px}
-.experience-reminder-empty h3{font:700 22px var(--serif,Georgia,serif);color:var(--ink,#142b39);margin:0 0 9px}
+.experience-reminder-empty h3{font:700 22px var(--serif,'Space Grotesk','Segoe UI',Arial,sans-serif);color:var(--ink,#142b39);margin:0 0 9px}
 .experience-reminder-empty p{font-size:12px;line-height:1.7;margin:0 0 16px;max-width:270px}
 .experience-reminder-empty button{padding:0;background:transparent;border:0;font:600 11px var(--sans,'Segoe UI',Arial,sans-serif);color:var(--coral-dark,#d6533c);cursor:pointer}
 .experience-notification-optin{display:grid;grid-template-columns:35px minmax(0,1fr);gap:10px 12px;border:1px solid var(--line,#deded8);border-radius:15px;padding:19px;margin-top:auto}
@@ -70,13 +70,13 @@
   .experience-reminder-item:first-child{padding:12px;border:1px solid var(--line,#deded8);border-radius:10px;background:color-mix(in srgb,var(--ink,#142b39) 3%,var(--paper,#faf7f2));gap:10px;margin-bottom:6px}
   .experience-reminder-item:first-child .experience-reminder-anime{gap:13px}
   .experience-reminder-item:first-child .experience-reminder-anime img,.experience-reminder-item:first-child .experience-reminder-poster-fallback{width:79px;height:112px;flex-basis:79px}
-  .experience-reminder-item:first-child .experience-reminder-anime strong{font:700 18px/1.25 var(--serif,Georgia,serif);-webkit-line-clamp:3}
+  .experience-reminder-item:first-child .experience-reminder-anime strong{font:700 18px/1.25 var(--serif,'Space Grotesk','Segoe UI',Arial,sans-serif);-webkit-line-clamp:3}
   .experience-reminder-item:first-child .experience-reminder-anime small{line-height:1.6;font-size:10px;color:var(--coral-dark,#d6533c)}
   .experience-notification-optin{padding:16px;border-radius:10px;margin-top:auto}
   .experience-theme-setting{padding:14px 16px;border-radius:10px;margin-top:10px}
   .experience-theme-setting h3{font-size:13px}
   .experience-install{grid-template-columns:25px minmax(0,1fr);margin-top:19px;padding:17px;border:1px solid var(--line,#deded8);border-radius:12px;background:color-mix(in srgb,var(--paper,#faf7f2) 96%,var(--ink,#142b39))}
-  .experience-install h3{font-family:var(--serif,Georgia,serif);font-size:20px}
+  .experience-install h3{font-family:var(--serif,'Space Grotesk','Segoe UI',Arial,sans-serif);font-size:20px}
   .experience-install p{font-size:11px}
   .experience-install>button{grid-column:1/-1;justify-self:stretch;margin-top:3px;background:var(--coral,#f16f5b);border-color:var(--coral,#f16f5b);color:#fff;min-height:37px;font-size:11px}
 }

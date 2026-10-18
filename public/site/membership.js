@@ -441,6 +441,13 @@
       clearTimeout(searchTimer); searchTimer = setTimeout(loadMembers, 300);
     });
     window.addEventListener('anime:librarychange', libraryChanged);
+    window.addEventListener('anime:avatarframechange', event => {
+      const value = event.detail;
+      if (!activeMember() || value?.userId !== state.account.user.id || typeof value.frameId !== 'string' || !/^[a-z-]{1,32}$/.test(value.frameId)) return;
+      // The profile UI emits this only after the authenticated save is accepted.
+      state.account.user.avatarFrame = value.frameId;
+      renderAccount();
+    });
     window.addEventListener('anime:navigate', () => { if (state.adminOpen) closeAdmin(); });
     window.addEventListener('hashchange', () => { if (state.adminOpen) closeAdmin(); });
     window.addEventListener('anime:viewrender', enforceAdminLayout);

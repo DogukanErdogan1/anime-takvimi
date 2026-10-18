@@ -1,0 +1,69 @@
+/* Keep score and save chips readable in every palette, in both catalog views. */
+body[data-experience=true] {
+  --catalog-star: color-mix(in srgb, #dca13c 74%, var(--ink));
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-meta .card-rating,
+body[data-experience=true] .exp-pick-cover .exp-score {
+  background: var(--theme-surface, var(--paper));
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line), 0 2px 7px #00000014;
+  text-shadow: none;
+}
+
+body[data-experience=true] .catalog-grid .card-rating strong {
+  color: inherit;
+}
+
+body[data-experience=true] .catalog-grid .card-rating .icon,
+body[data-experience=true] .exp-pick-cover .exp-score svg {
+  color: var(--catalog-star);
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-bottom .bookmark-button {
+  background: var(--theme-surface, var(--paper));
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line), 0 2px 7px #00000014;
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .bookmark-button .icon {
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-bottom .bookmark-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--coral) 14%, var(--theme-surface, var(--paper)));
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--coral), 0 2px 7px #00000014;
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-bottom .bookmark-button:is(.is-saved, .saved, .active, [aria-pressed=true]) {
+  background: var(--coral);
+  color: var(--theme-on-accent, var(--paper));
+  box-shadow: 0 0 0 1px var(--coral), 0 2px 7px #00000014;
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-bottom .bookmark-button:is(.is-saved, .saved, .active, [aria-pressed=true]):hover:not(:disabled) {
+  background: var(--coral);
+  color: var(--theme-on-accent, var(--paper));
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+body[data-experience=true] :is(.catalog-grid, .catalog-grid.list-view) .card-bottom .bookmark-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--paper);
+}
+
+body[data-experience=true] .at-detail-meta .at-mal-score {
+  color: var(--ink);
+}
+
+body[data-experience=true] .at-detail-meta .at-mal-score svg {
+  color: var(--catalog-star);
+  fill: currentColor;
+  stroke: currentColor;
+}

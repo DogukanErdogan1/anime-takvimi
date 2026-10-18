@@ -1,8 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {advanceEpisode,recommendations,watchStatus} from '../components/experience/model.ts';
+import {advanceEpisode,recommendations,searchSuggestions,watchStatus} from '../components/experience/model.ts';
 const item=(id,genres=[],members=1,episodes=12)=>({id:`mal-${id}`,malId:id,title:`Anime${id}`,image:null,genres,members,episodes,rating:8});
 const library=overrides=>({saved:[],reminders:[],progress:{},savedAnime:{},tracking:{},scores:{},favorites:[],collections:[],view:'grid',...overrides});
+
+test('search suggestions handle Turkish letters, aliases and genres without duplicate anime',()=>{
+ const title={...item(1,['Bilim Kurgu']),title:'Şehir Işıkları',original:'City Lights',synonyms:['Hikari no Machi']};
+ assert.equal(searchSuggestions('sehir isiklari',[title])[0],title);
+ assert.equal(searchSuggestions('CITY LIGHTS',[title])[0],title);
+ assert.equal(searchSuggestions('hikari machi',[title])[0],title);
+ assert.equal(searchSuggestions('bilim kurgu',[title,title]).length,1);
+ assert.deepEqual(searchSuggestions('s',[title]),[]);
+});
+
+test('search ranks exact title before prefix and substring, then uses popularity and limits results',()=>{
+ const exact={...item(1,[],1),title:'Naruto'};
+ const prefix={...item(2,[],10),title:'Naruto Shippuden'};
+ const suffix={...item(3,[],100),title:'Road to Naruto'};
+ const popularPrefix={...item(4,[],500),title:'Naruto Movie'};
+ assert.deepEqual(searchSuggestions('naruto',[suffix,prefix,popularPrefix,exact,exact],3).map(item=>item.id),['mal-1','mal-4','mal-2']);
+});
 test('legacy progress derives watching/completed while explicit dropped takes precedence',()=>{
  const anime=item(1);
  assert.equal(watchStatus(anime,library({progress:{'mal-1':3}})),'watching');

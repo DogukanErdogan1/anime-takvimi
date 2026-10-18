@@ -1,0 +1,22 @@
+/* The atlas contains only transparent ornaments. Photos remain the user's own. */
+.at-avatar-frame{position:absolute;z-index:3;inset:18%;width:64%;height:64%;pointer-events:none;display:block;isolation:isolate}
+.at-avatar-frame>svg{display:block;width:100%;height:100%;overflow:visible}
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame),
+body[data-experience=true] .profile-photo-preview:has(.at-avatar-frame),
+.at-profile-avatar:has(.at-avatar-frame){position:relative;overflow:visible;isolation:isolate}
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame){margin-inline:5px;background:none}
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame)>img{position:absolute;z-index:1;inset:18%;display:block;width:64%;height:64%;object-fit:cover;border-radius:50%}
+.at-profile-avatar:has(.at-avatar-frame){border-color:transparent;background:none}
+.at-profile-avatar:has(.at-avatar-frame)>img{inset:18%;width:64%;height:64%;border-radius:50%}
+.at-profile-avatar:has(.at-avatar-frame)>span:not(.at-avatar-frame),
+.at-frame-avatar:has(.at-avatar-frame)>span:not(.at-avatar-frame),
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame)>.avatar-initials{position:absolute;inset:18%;width:64%;height:64%;display:grid;place-items:center;background:var(--theme-nav,#142b39);color:#fff;border-radius:50%;overflow:hidden;font-size:clamp(11px,1.8vw,25px)}
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame)>.avatar-initials{font-size:10px}
+body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame)>.avatar-initials[hidden]{display:none}
+.at-frame-avatar{position:relative;isolation:isolate}
+.at-frame-avatar:has(.at-avatar-frame){background:transparent}
+.at-frame-avatar>img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.at-frame-avatar:has(.at-avatar-frame)>img{position:absolute;inset:18%;width:64%;height:64%}
+.at-frame-avatar>.at-avatar-frame{position:absolute}
+.at-account-frame-slot{position:absolute;inset:0;pointer-events:none;z-index:3}
+@media(max-width:640px){body[data-experience=true] .rail .account-avatar:has(.at-avatar-frame){margin-inline:4px}}

@@ -335,7 +335,7 @@ body[data-page="schedule"] #catalog-section > .data-toolbar { padding-top: 12px;
 /* The discovery page keeps its own masthead and palette around this compact map. */
 .broadcast-preview { margin: 22px 0 26px; padding: 0 20px 14px; border: 1px solid var(--map-line); border-radius: 12px; overflow: hidden; }
 .broadcast-preview .map-heading { gap: 7px 22px; padding: 22px 0 19px; }
-.broadcast-preview .map-heading :is(h1,h2) { font-size: 32px; line-height: 1.08; letter-spacing: -.045em; }
+.broadcast-preview .map-heading :is(h1,h2) { font-size: 32px; line-height: 1.08; letter-spacing: -.035em; }
 .broadcast-preview .map-heading :is(h1,h2) > span,
 .broadcast-preview .map-heading :is(h1,h2) > strong { display: inline; }
 .broadcast-preview .map-heading :is(h1,h2) > span::after { content: ' '; }
@@ -433,7 +433,7 @@ body[data-page="schedule"] #catalog-section > .data-toolbar { padding-top: 12px;
   font-family: var(--serif);
   font-weight: 500;
   line-height: 1.08;
-  letter-spacing: -.045em;
+  letter-spacing: -.035em;
 }
 .map-copy strong { font-family: var(--serif); font-size: 14px; font-weight: 600; }
 .map-next-copy strong { font-family: var(--serif); font-weight: 500; }

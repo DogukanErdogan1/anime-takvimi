@@ -4,6 +4,21 @@ export const statuses: {id:WatchStatus;label:string}[] = [
   {id:'watching',label:'İzliyorum'},{id:'planned',label:'İzleyeceğim'},
   {id:'completed',label:'Tamamladım'},{id:'dropped',label:'Bıraktım'},
 ];
+export function searchSuggestions(query:string,items:Anime[],limit=8):Anime[]{
+  const fold=(value:string)=>value.normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/\s+/g,' ').trim();
+  const needle=fold(query);
+  if(needle.length<2)return [];
+  const words=needle.split(' '),seen=new Set<string>();
+  return items.flatMap(item=>{
+    if(seen.has(item.id))return [];
+    seen.add(item.id);
+    const names=[item.title,item.original||'',...(item.synonyms||[])].map(fold);
+    const text=[...names,...item.genres.map(fold)].join(' ');
+    if(!words.every(word=>text.includes(word)))return [];
+    const rank=names.includes(needle)?0:names.some(name=>name.startsWith(needle))?1:names.some(name=>name.includes(needle))?2:3;
+    return [{item,rank}];
+  }).sort((a,b)=>a.rank-b.rank||b.item.members-a.item.members).slice(0,limit).map(result=>result.item);
+}
 export function watchStatus(item:Anime, library:Library):WatchStatus {
   if (library.tracking[item.id]) return library.tracking[item.id];
   const count = library.progress[item.id] || 0;

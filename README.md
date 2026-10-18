@@ -69,6 +69,10 @@ Sinematik ana sayfa, izleme listesi, anime ayrıntıları, profil ve bildirim ko
 
 `0004_community.sql` profil ve yorum tablolarını, `0005_member_covers.sql` profil kapağı kayıtlarını ekler; güncellemeden sonra yerel veritabanına `npm run db:migrate` uygulanmalıdır.
 
+## Yazı tipi
+
+Daha önce serif kullanılan başlıklar, kartlar ve giriş ekranları yerel **Space Grotesk** değişken fontunu kullanır (300–700 ağırlık). Türkçe karakterler font dosyasına dahildir; ziyaretçinin harici font hizmetine bağlanması gerekmez. Font ve SIL Open Font License, `public/site/fonts/` klasöründedir. Kaynak: [Google Fonts / Space Grotesk](https://github.com/google/fonts/tree/main/ofl/spacegrotesk).
+
 ## Kontroller
 
 ```sh

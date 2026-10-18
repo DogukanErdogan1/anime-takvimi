@@ -45,6 +45,9 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // Discover the shared menu primitives before serving the React module graph.
+    // Late dependency discovery can otherwise mix cached JSX runtime versions.
+    optimizeDeps: { include: ["radix-ui"] },
     server: {
       ...(process.env.ANIME_LOCAL_LAUNCHER === "1" ? { strictPort: true } : {}),
       ...(managedLinux

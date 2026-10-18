@@ -2,10 +2,14 @@
 
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {ArrowRight,Bell,Bookmark,Check,ChevronRight,CircleCheck,Compass,Heart,Play,Plus,Search,Star,X} from 'lucide-react';
+import {ArrowRight,Bell,Bookmark,Check,ChevronRight,Compass,Heart,Plus,Search,Star,X} from 'lucide-react';
 import {AnimeDetail,ProfileView} from './detail-profile';
 import {ExperienceControls} from './notifications';
-import {advanceEpisode,recommendations,statuses,watchStatus} from './model';
+import {WatchStatusSelect} from './watch-status-select';
+import CatalogFilters from './catalog-filters';
+import ThemePicker from './theme-picker';
+import AccountAvatarFrames from './account-avatar-frames';
+import {advanceEpisode,recommendations,searchSuggestions,statuses,watchStatus} from './model';
 import {todayFollowed} from './reminder-logic';
 import type {Anime,ExperienceSnapshot,Library,LibraryChange,WatchStatus} from './types';
 import './experience.css';
@@ -30,12 +34,7 @@ function useBanner(item:Anime|undefined){
   useEffect(()=>{let alive=true,generation=0;const load=()=>{const token=++generation;setBanner(null);if(item)window.AnimeBanners?.resolve(item.malId).then(value=>{if(alive&&token===generation)setBanner(window.AnimeBanners?.safeBanner(value,item.malId)||null);});};const changed=(event:Event)=>{if((event as CustomEvent).detail?.malId===item?.malId)load();};load();window.addEventListener('anime:bannerchange',changed);return()=>{alive=false;window.removeEventListener('anime:bannerchange',changed);};},[item?.malId]);
   return banner;
 }
-function ContinueCard({item,snapshot,onChange,onDetail}:{item:Anime;snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
-  const count=snapshot.library.progress[item.id]||0;
-  return <article className="exp-continue-card"><button className="exp-cover-button" onClick={()=>onDetail(item)}><Poster item={item}/></button><div><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><p>{count}{item.episodes?` / ${item.episodes}`:''} bölüm</p><div className="exp-progress" role="progressbar" aria-label={`${item.title} izleme ilerlemesi`} aria-valuenow={count} aria-valuemin={0} aria-valuemax={item.episodes||9999}><span style={{width:`${Math.min(100,item.episodes?count/item.episodes*100:0)}%`}}/></div><button className="exp-increment" disabled={snapshot.blocked||snapshot.libraryLoading||!!item.episodes&&count>=item.episodes} onClick={()=>onChange(current=>advanceEpisode(item,current))}><Plus size={14}/> Bölüm</button></div></article>;
-}
 export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
-  const [tab,setTab]=useState<WatchStatus>('watching');
   const [offset,setOffset]=useState(0);
   const saved=snapshot.library.saved.map(id=>snapshot.library.savedAnime[id]).filter(Boolean);
   const continuing=saved.filter(item=>watchStatus(item,snapshot.library)==='watching');
@@ -46,9 +45,7 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
   const start=offset<suggestions.length?offset:0;
   const picks=suggestions.slice(start,start+4);
   const today=todayFollowed([...snapshot.schedule,...snapshot.catalog,...Object.values(snapshot.library.savedAnime)],[...snapshot.library.saved,...snapshot.library.reminders],new Date()).slice(0,2);
-  const selected=saved.filter(item=>watchStatus(item,snapshot.library)===tab).slice(0,3);
   const name=snapshot.account?.user?.displayName;
-  const statusIcons={watching:Play,planned:Bookmark,completed:CircleCheck,dropped:X};
   useEffect(()=>{if(saved.length||snapshot.library.reminders.length)window.animeTakvimi?.loadSchedule();},[snapshot.accountScope,saved.length,snapshot.library.reminders.length]);
   return <section className="exp-home" aria-label="Sana özel anime dünyası">
     <div className={'exp-cinema'+(banner?' has-banner':'')}>
@@ -71,12 +68,10 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
     <div className="exp-personal-strip">
       <div className="exp-discovery-layout">
         <div className="exp-discovery-copy">
-          <div className="exp-status-tabs" role="group" aria-label="İzleme durumun">{statuses.map(status=>{const Icon=statusIcons[status.id];return <button key={status.id} aria-pressed={tab===status.id} className={tab===status.id?'active':''} onClick={()=>setTab(status.id)}><Icon size={17}/>{status.label}<span>{saved.filter(item=>watchStatus(item,snapshot.library)===status.id).length}</span></button>;})}</div>
           <div className="exp-recommendation-title"><small>{saved.length?'SANA ÖZEL ÖNERİLER':'SEZONDAN SEÇTİKLERİMİZ'}</small><h2>Bir sonraki<br/>favorin<span>.</span></h2><p>{saved.length?'Sevdiğin hikâyelerden yola çıktık.':'Listeni oluştur, sana uygun hikâyeleri birlikte bulalım.'}</p></div>
         </div>
         <div className="exp-recommendation-area"><div className="exp-recommendation-posters">{picks.length?picks.map(({item,reason})=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{item.rating!==null&&<span className="exp-score"><Star size={12}/>{item.rating.toFixed(1)}</span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><p>{reason?reason+' sevdiğin için':item.genres.slice(0,3).join(' · ')||item.format}</p></article>):<p className="exp-muted">{snapshot.loading?'Öneriler hazırlanıyor…':snapshot.error||'Bu sezon için henüz öneri bulunamadı.'}</p>}</div>{suggestions.length>4&&<button className="exp-recommendation-next" aria-label="Sonraki anime önerileri" onClick={()=>setOffset(start+4>=suggestions.length?0:start+4)}><ChevronRight size={19}/></button>}</div>
       </div>
-      {selected.length>0&&<details className="exp-home-library"><summary>{statuses.find(status=>status.id===tab)?.label} <span>{selected.length} anime</span><ChevronRight size={14}/></summary><div className="exp-continue-row">{selected.map(item=><ContinueCard key={item.id} item={item} snapshot={snapshot} onChange={onChange} onDetail={onDetail}/>)}</div><a href="#watchlist">Listemin tamamı <ArrowRight size={14}/></a></details>}
     </div>
   </section>;
 }
@@ -84,25 +79,156 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
 export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
   const [tab,setTab]=useState<WatchStatus|'all'>('all');
   const items=snapshot.library.saved.map(id=>snapshot.library.savedAnime[id]).filter(Boolean).filter(item=>tab==='all'||watchStatus(item,snapshot.library)===tab);
-  return <section className="exp-watchlist"><header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header><div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele"><button className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{snapshot.library.saved.length}</span></button>{statuses.map(status=><button key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}<a href="#profile">Profilim <ArrowRight size={14}/></a></div>{snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:items.length?<div className="exp-library-grid">{items.map(item=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{snapshot.library.favorites.includes(item.id)&&<span className="exp-favorite-badge"><Heart size={17} fill="currentColor"/></span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><label className="exp-status-select">Durum<select disabled={snapshot.blocked} value={watchStatus(item,snapshot.library)} onChange={event=>{const value=event.target.value as WatchStatus;onChange(current=>({tracking:{...current.tracking,[item.id]:value},...(value==='completed'&&item.episodes?{progress:{...current.progress,[item.id]:item.episodes}}:{})}));}}>{statuses.map(status=><option value={status.id} key={status.id}>{status.label}</option>)}</select></label><p className="exp-muted">{snapshot.library.progress[item.id]||0}{item.episodes?` / ${item.episodes}`:''} bölüm</p><button className="exp-text-button" disabled={snapshot.blocked||!!item.episodes&&(snapshot.library.progress[item.id]||0)>=item.episodes} onClick={()=>onChange(current=>advanceEpisode(item,current))}><Plus size={14}/> Bölüm izledim</button></article>)}</div>:<div className="exp-empty"><Bookmark size={34}/><h2>Burada yeni hikâyelere yer var.</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a></div>}</section>;
+  return <section className="exp-watchlist"><header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header><div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele"><button className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{snapshot.library.saved.length}</span></button>{statuses.map(status=><button key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}<a href="#profile">Profilim <ArrowRight size={14}/></a></div>{snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:items.length?<div className="exp-library-grid">{items.map(item=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{snapshot.library.favorites.includes(item.id)&&<span className="exp-favorite-badge"><Heart size={17} fill="currentColor"/></span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><div className="exp-status-select"><span>Durum</span><WatchStatusSelect disabled={snapshot.blocked} value={watchStatus(item,snapshot.library)} label={item.title+' izleme durumu'} onChange={value=>{onChange(current=>({tracking:{...current.tracking,[item.id]:value},...(value==='completed'&&item.episodes?{progress:{...current.progress,[item.id]:item.episodes}}:{})}));}}/></div><p className="exp-muted">{snapshot.library.progress[item.id]||0}{item.episodes?` / ${item.episodes}`:''} bölüm</p><button className="exp-text-button" disabled={snapshot.blocked||!!item.episodes&&(snapshot.library.progress[item.id]||0)>=item.episodes} onClick={()=>onChange(current=>advanceEpisode(item,current))}><Plus size={14}/> Bölüm izledim</button></article>)}</div>:<div className="exp-empty"><Bookmark size={34}/><h2>Burada yeni hikâyelere yer var.</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a></div>}</section>;
 }
-function NavigationSearch(){
+function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapshot:ExperienceSnapshot;onDetail:(item:Anime)=>void}){
   const [query,setQuery]=useState('');
   const [expanded,setExpanded]=useState(false);
+  const [activeId,setActiveId]=useState<string|null>(null);
+  const [remote,setRemote]=useState<{query:string;items:Anime[];status:'idle'|'loading'|'ready'|'error'}>({query:'',items:[],status:'idle'});
   const input=useRef<HTMLInputElement>(null);
   const toggle=useRef<HTMLButtonElement>(null);
+  const list=useRef<HTMLUListElement>(null);
+  const term=query.trim().slice(0,100);
+  const local=searchSuggestions(term,[...snapshot.catalog,...snapshot.schedule,...Object.values(snapshot.library.savedAnime)]);
+  const results=Array.from(new Map([...local,...(remote.query===term?remote.items:[])].map(item=>[item.id,item])).values()).slice(0,8);
+  const activeIndex=results.findIndex(item=>item.id===activeId);
+  const loading=term.length>=2&&(remote.query!==term||remote.status==='loading'||remote.status==='idle');
+  const failed=remote.query===term&&remote.status==='error';
   useEffect(()=>{if(!expanded)return;const frame=requestAnimationFrame(()=>input.current?.focus());return()=>cancelAnimationFrame(frame);},[expanded]);
+  useEffect(()=>{window.dispatchEvent(new Event('anime:navlayout'));},[expanded,term,results.length,remote.status]);
+  useEffect(()=>{
+    const viewport=list.current,option=viewport?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if(activeIndex<0||!viewport||!option)return;
+    const top=option.offsetTop,bottom=top+option.offsetHeight;
+    if(top<viewport.scrollTop)viewport.scrollTop=top;
+    else if(bottom>viewport.scrollTop+viewport.clientHeight)viewport.scrollTop=bottom-viewport.clientHeight;
+  },[activeId,activeIndex]);
+  useEffect(()=>{
+    if(!expanded||term.length<2){setRemote({query:term,items:[],status:'idle'});return;}
+    let alive=true;const controller=new AbortController();
+    setRemote({query:term,items:[],status:'loading'});
+    const timer=setTimeout(async()=>{
+      try{
+        if(!window.AnimeData?.searchAnime)throw new Error('Search unavailable');
+        const response=await window.AnimeData.searchAnime(term,{signal:controller.signal});
+        if(alive&&!controller.signal.aborted)setRemote({query:term,items:response.anime,status:'ready'});
+      }catch{
+        if(alive&&!controller.signal.aborted)setRemote({query:term,items:[],status:'error'});
+      }
+    },350);
+    return()=>{alive=false;clearTimeout(timer);controller.abort();};
+  },[expanded,term]);
   const close=(restoreFocus=false)=>{setExpanded(false);if(restoreFocus)toggle.current?.focus();};
-  return <div className="exp-nav-search-anchor"><form className={'exp-nav-search'+(expanded?' is-open':'')} role="search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))close();}} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);}}} onSubmit={event=>{event.preventDefault();if(!expanded){setExpanded(true);return;}if(!query.trim()){input.current?.focus();return;}window.animeTakvimi?.navigate('discover');const search=document.getElementById('search') as HTMLInputElement|null;if(search){search.value=query.trim();search.dispatchEvent(new Event('input',{bubbles:true}));close();requestAnimationFrame(()=>{search.scrollIntoView({block:'center',behavior:'smooth'});search.focus({preventScroll:true});});}}}>
-    <button ref={toggle} type={expanded?'submit':'button'} className="exp-search-trigger" onClick={event=>{if(!expanded){event.preventDefault();setExpanded(true);}}} aria-label={expanded?'Anime ara':'Aramayı aç'} aria-expanded={expanded} aria-controls="nav-anime-search"><Search size={19}/></button>
-    <input ref={input} id="nav-anime-search" type="search" value={query} tabIndex={expanded?0:-1} aria-hidden={!expanded} onChange={event=>setQuery(event.target.value)} placeholder="Anime, seri veya tür ara…" aria-label="Anime, seri veya tür ara" autoComplete="off"/>
-    <button type="button" className="exp-search-close" tabIndex={expanded?0:-1} aria-hidden={!expanded} onClick={()=>close(true)} aria-label="Aramayı kapat"><X size={16}/></button>
-  </form></div>;
+  const choose=(item:Anime)=>{close(true);onDetail(item);};
+  const status=term.length<2?'Anime bulmak için en az 2 karakter yaz.':loading?'Animeler aranıyor…':failed?(results.length?'Çevrimiçi arama yapılamadı. Mevcut eşleşmeler gösteriliyor.':'Arama şu an kullanılamıyor. Biraz sonra tekrar dene.'):results.length?`${results.length} öneri`:`“${term}” için sonuç bulunamadı.`;
+  return <div className="exp-nav-search-anchor">
+    <button ref={toggle} type="button" className={'exp-search-toggle'+(expanded?' is-open':'')} onClick={()=>{if(rail){setExpanded(true);input.current?.focus();}}} aria-label="Aramayı aç" aria-expanded={expanded} aria-controls="nav-search-panel"><Search size={19}/></button>
+    {expanded&&rail&&createPortal(<form id="nav-search-panel" className="exp-nav-search-panel" role="search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))close();}} onKeyDown={event=>{
+      if(event.nativeEvent.isComposing){if(event.key==='Enter')event.preventDefault();return;}
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);}
+      if(event.target===input.current&&(event.key==='ArrowDown'||event.key==='ArrowUp')&&results.length){event.preventDefault();const next=event.key==='ArrowDown'?(activeIndex+1)%results.length:activeIndex<=0?results.length-1:activeIndex-1;setActiveId(results[next].id);}
+    }} onSubmit={event=>{event.preventDefault();const selected=results[activeIndex>=0?activeIndex:0];if(selected)choose(selected);else input.current?.focus();}}>
+      <div className="exp-nav-search exp-nav-search-row is-open">
+        <button type="submit" className="exp-search-trigger" aria-label="Seçili animeyi aç"><Search size={19}/></button>
+        <input ref={input} id="nav-anime-search" type="search" role="combobox" value={query} maxLength={100} onChange={event=>{setQuery(event.target.value);setActiveId(null);}} placeholder="Anime, seri veya tür ara…" aria-label="Anime, seri veya tür ara" autoComplete="off" spellCheck={false} aria-autocomplete="list" aria-expanded={results.length>0} aria-controls="nav-search-results" aria-activedescendant={activeIndex>=0?`nav-result-${results[activeIndex].id}`:undefined} aria-describedby="nav-search-status"/>
+        <button type="button" className="exp-search-close" onClick={()=>close(true)} aria-label="Aramayı kapat"><X size={16}/></button>
+      </div>
+      <div className="exp-search-suggestions">
+        <div className="exp-search-status"><span id="nav-search-status" role="status" aria-live="polite">{status}</span>{results.length>0&&<small>↑ ↓ ile seç · Enter ile aç</small>}</div>
+        <ul ref={list} id="nav-search-results" className="exp-search-results" role="listbox" aria-label="Anime önerileri" aria-busy={loading}>
+          {results.map(item=><li id={`nav-result-${item.id}`} key={item.id} role="option" aria-selected={item.id===activeId} onMouseEnter={()=>setActiveId(item.id)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(item)}>
+            <span className="exp-search-poster" aria-hidden="true"><Poster item={item}/></span>
+            <span className="exp-search-result-copy"><strong>{item.title}</strong>{item.original&&item.original!==item.title&&<span>{item.original}</span>}<small>{[item.format,item.year,item.episodes?`${item.episodes} bölüm`:null].filter(Boolean).join(' · ')}</small></span>
+            {item.rating!==null&&<span className="exp-search-rating"><Star size={12}/>{item.rating.toFixed(1)}</span>}<ChevronRight size={15} aria-hidden="true"/>
+          </li>)}
+        </ul>
+      </div>
+    </form>,rail)}
+  </div>;
+}
+function useNavigationEffects(page:string,ready:boolean){
+  const currentPage=useRef(page);
+  const refresh=useRef<(()=>void)|null>(null);
+  currentPage.current=page;
+  useEffect(()=>{
+    if(!ready)return;
+    const rail=document.querySelector<HTMLElement>('.site-masthead .rail');
+    const nav=document.getElementById('nav-items');
+    if(!rail||!nav)return;
+    const spacer=document.createElement('div');
+    spacer.className='exp-nav-spacer';spacer.setAttribute('aria-hidden','true');
+    spacer.style.height=rail.getBoundingClientRect().height+'px';
+    rail.parentNode?.insertBefore(spacer,rail);
+    const indicator=document.createElement('span');
+    indicator.className='exp-nav-indicator';indicator.setAttribute('aria-hidden','true');
+    nav.appendChild(indicator);
+    const previousOffset=document.documentElement.style.getPropertyValue('--navigation-offset');
+    document.body.dataset.navEffects='true';
+    let frame=0,positionFrame=0,needsSpace=true,disposed=false;
+    const reserveSpace=()=>{
+      // Measure the full navbar on viewport/font changes. Its reserved space
+      // stays full-height while the fixed bar contracts, preventing scroll jumps.
+      const compact=rail.dataset.compact==='true';
+      rail.dataset.measuring='true';rail.dataset.compact='false';
+      spacer.style.height=Math.ceil(rail.getBoundingClientRect().height)+'px';
+      rail.dataset.compact=String(compact);
+      void rail.offsetHeight;
+      delete rail.dataset.measuring;
+    };
+    const measure=()=>{
+      frame=0;if(disposed)return;
+      const compact=rail.dataset.compact==='true';
+      rail.dataset.compact=String(compact?window.scrollY>24:window.scrollY>72);
+      if(needsSpace){reserveSpace();needsSpace=false;}
+      document.documentElement.style.setProperty('--navigation-offset',Math.ceil(rail.getBoundingClientRect().height+16)+'px');
+      const buttons=Array.from(nav.querySelectorAll<HTMLElement>('.nav-item'));
+      const selected=buttons.find(button=>!button.hidden&&(currentPage.current==='admin'?button.id==='admin-nav':button.dataset.page===currentPage.current));
+      for(const button of buttons){
+        if(button===selected){if(button.getAttribute('aria-current')!=='page')button.setAttribute('aria-current','page');}
+        else if(button.hasAttribute('aria-current'))button.removeAttribute('aria-current');
+      }
+      const target=selected?.getBoundingClientRect();
+      if(!target?.width){indicator.dataset.visible='false';return;}
+      const bounds=nav.getBoundingClientRect();
+      indicator.style.width=target.width+'px';
+      indicator.style.transform=`translateX(${target.left-bounds.left+nav.scrollLeft}px)`;
+      indicator.dataset.visible='true';
+      if(!indicator.dataset.positioned&&!positionFrame)positionFrame=requestAnimationFrame(()=>{positionFrame=0;if(!disposed)indicator.dataset.positioned='true';});
+    };
+    const schedule=(space=false)=>{needsSpace||=space;if(!frame&&!disposed)frame=requestAnimationFrame(measure);};
+    const resize=()=>schedule(true),scroll=()=>schedule();
+    const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>schedule()):null;
+    observer?.observe(rail);observer?.observe(nav);
+    nav.querySelectorAll('.nav-item').forEach(button=>observer?.observe(button));
+    const mutations=new MutationObserver(records=>schedule(records.some(record=>record.type==='childList'||record.attributeName==='hidden')));
+    mutations.observe(nav,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','class','aria-current']});
+    const account=rail.querySelector('.nav-account');
+    const accountChanges=new MutationObserver(()=>schedule(true));
+    if(account)accountChanges.observe(account,{childList:true,subtree:true});
+    window.addEventListener('scroll',scroll,{passive:true});
+    window.addEventListener('resize',resize);
+    window.addEventListener('anime:navlayout',resize);
+    nav.addEventListener('scroll',scroll,{passive:true});
+    document.fonts?.addEventListener('loadingdone',resize);
+    document.fonts?.ready.then(()=>{if(!disposed)schedule(true);});
+    refresh.current=()=>schedule();schedule(true);
+    return()=>{
+      disposed=true;cancelAnimationFrame(frame);cancelAnimationFrame(positionFrame);
+      observer?.disconnect();mutations.disconnect();accountChanges.disconnect();
+      window.removeEventListener('scroll',scroll);window.removeEventListener('resize',resize);window.removeEventListener('anime:navlayout',resize);nav.removeEventListener('scroll',scroll);
+      document.fonts?.removeEventListener('loadingdone',resize);
+      refresh.current=null;indicator.remove();spacer.remove();
+      delete rail.dataset.compact;delete rail.dataset.measuring;delete document.body.dataset.navEffects;
+      if(previousOffset)document.documentElement.style.setProperty('--navigation-offset',previousOffset);else document.documentElement.style.removeProperty('--navigation-offset');
+    };
+  },[ready]);
+  useEffect(()=>{refresh.current?.();},[page,ready]);
 }
 export default function AnimeExperience(){
   const [snapshot,setSnapshot]=useState(initial);
   const [hash,setHash]=useState('');
-  const [slots,setSlots]=useState<{home:HTMLElement;page:HTMLElement;nav:HTMLElement}|null>(null);
+  const [slots,setSlots]=useState<{home:HTMLElement;page:HTMLElement;nav:HTMLElement;menu:HTMLElement}|null>(null);
   const [detail,setDetail]=useState<Anime|null>(null);
   const [notice,setNotice]=useState('');
   const previousFocus=useRef<HTMLElement|null>(null);
@@ -110,7 +236,7 @@ export default function AnimeExperience(){
   useEffect(()=>{
     window.AnimeExperienceMounted=true;
     let frame=0;
-    const sync=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{setSnapshot(readSnapshot());setHash(location.hash.slice(1));const home=document.getElementById('experience-home-slot'),page=document.getElementById('experience-page-slot'),nav=document.getElementById('experience-nav-slot');if(home&&page&&nav)setSlots(previous=>previous||{home,page,nav});});};
+    const sync=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{setSnapshot(readSnapshot());setHash(location.hash.slice(1));const home=document.getElementById('experience-home-slot'),page=document.getElementById('experience-page-slot'),nav=document.getElementById('experience-nav-slot'),menu=document.getElementById('nav-items');if(home&&page&&nav&&menu)setSlots(previous=>previous||{home,page,nav,menu});});};
     const showDetail=(event:Event)=>{const item=(event as CustomEvent<Anime>).detail;if(item?.id){previousFocus.current=document.activeElement as HTMLElement;previousScroll.current=window.scrollY;setDetail(item);window.scrollTo({top:0});}};
     const dismissDetail=()=>setDetail(null);
     const profile=()=>{setDetail(null);if(window.AnimeMembership?.isAdminOpen?.())window.AnimeMembership.closeAdmin();location.hash='profile';sync();};
@@ -125,8 +251,9 @@ export default function AnimeExperience(){
   const admin=typeof window!=='undefined'&&window.AnimeMembership?.isAdminOpen?.();
   const page=admin?'admin':detail?'detail':profile?'profile':snapshot.page;
   useEffect(()=>{document.body.dataset.experiencePage=page;if(snapshot.ready)document.body.dataset.experience='true';},[page,snapshot.ready]);
+  useNavigationEffects(page,snapshot.ready);
   useEffect(()=>{setDetail(null);},[hash,snapshot.accountScope]);
-  useEffect(()=>{if(!detail)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!document.querySelector('dialog[open]'))closeDetail();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[detail]);
+  useEffect(()=>{if(!detail)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('dialog[open]'))closeDetail();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[detail]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(timer);},[notice]);
   const change=useCallback<LibraryChange>((patch)=>{
     const current=readSnapshot();
@@ -137,7 +264,9 @@ export default function AnimeExperience(){
   const closeDetail=()=>{setDetail(null);requestAnimationFrame(()=>{window.scrollTo({top:previousScroll.current});if(previousFocus.current?.isConnected)previousFocus.current.focus({preventScroll:true});else document.getElementById('main')?.focus({preventScroll:true});});};
   let publicUserId:string|undefined;
   if(hash.startsWith('profile=')){try{publicUserId=decodeURIComponent(hash.slice(8));}catch{publicUserId=hash.slice(8);}}
-  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<><NavigationSearch/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
+  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
+    {snapshot.ready&&<CatalogFilters page={page}/>}
+    <AccountAvatarFrames ready={snapshot.ready} frameId={snapshot.account?.user?.avatarFrame}/>
     {notice&&<div className="exp-feedback" role="status">{notice}</div>}
   </>;
 }

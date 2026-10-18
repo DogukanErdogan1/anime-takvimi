@@ -85,18 +85,19 @@ function workerHarness() {
     fetch: async request => {
       requests.push(request);
       if (request.mode === 'navigate') throw new Error('offline');
-      return new Response('icon', {headers: {'Content-Type': 'image/png'}});
+      const font = new URL(request.url).pathname === '/site/fonts/space-grotesk-variable.ttf';
+      return new Response(font ? 'font' : 'icon', {headers: {'Content-Type': font ? 'font/ttf' : 'image/png'}});
     },
     URL, Request, Response,
   });
   return {handlers, requests, stored, deleted};
 }
 
-test('service worker caches only the three fixed public icons with credentials omitted', async () => {
+test('service worker caches only the three fixed public icons and heading font with credentials omitted', async () => {
   const {handlers, requests, stored, deleted} = workerHarness();
   let work;
   handlers.install({waitUntil: value => {work = value;}}); await work;
-  assert.deepEqual(stored.map(item => item.key).sort(), ['/favicon.svg', '/icon-192.png', '/icon-512.png']);
+  assert.deepEqual(stored.map(item => item.key).sort(), ['/favicon.svg', '/icon-192.png', '/icon-512.png', '/site/fonts/space-grotesk-variable.ttf']);
   assert.ok(requests.every(request => request.credentials === 'omit'));
   handlers.activate({waitUntil: value => {work = value;}}); await work;
   assert.deepEqual(deleted, ['anime-takvimi-public-icons-v0']);
