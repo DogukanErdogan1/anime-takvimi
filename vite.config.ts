@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
+import { fileURLToPath } from "node:url";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -30,6 +31,7 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async ({ command }) => {
+  const railwayBuild = process.env.ANIME_RAILWAY_BUILD === "1";
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -42,12 +44,26 @@ export default defineConfig(async ({ command }) => {
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
-  const { cloudflare } = await import("@cloudflare/vite-plugin");
+  const cloudflare = railwayBuild
+    ? undefined
+    : (await import("@cloudflare/vite-plugin")).cloudflare;
 
   return {
     // Discover the shared menu primitives before serving the React module graph.
     // Late dependency discovery can otherwise mix cached JSX runtime versions.
     optimizeDeps: { include: ["radix-ui"] },
+    ...(railwayBuild
+      ? {
+          resolve: {
+            alias: [
+              {
+                find: /^cloudflare:workers$/,
+                replacement: fileURLToPath(new URL("./lib/railway-workers-shim.mjs", import.meta.url)),
+              },
+            ],
+          },
+        }
+      : {}),
     server: {
       ...(process.env.ANIME_LOCAL_LAUNCHER === "1" ? { strictPort: true } : {}),
       ...(managedLinux
@@ -60,8 +76,8 @@ export default defineConfig(async ({ command }) => {
     plugins: [
       vinext(),
       sites({ mockAuth: false }),
-      connectorPreview(),
-      cloudflare({
+      ...(!railwayBuild ? [connectorPreview()] : []),
+      ...(cloudflare ? [cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         config: {
@@ -91,7 +107,8 @@ export default defineConfig(async ({ command }) => {
               ],
             }
           : {}),
-      }),
+      })] : []),
     ],
   };
 });
+
