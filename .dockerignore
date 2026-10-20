@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+.dev.vars
+.wrangler
+.anime-data
+.sites-runtime
+.vinext
+.next
+dist
+build
+node_modules
+output
+outputs
+tmp
+*.log
+
