@@ -378,6 +378,18 @@ test('mutation guard rejects a missing, null, foreign, or downgraded Origin', as
   await enforceMutation(request());
 });
 
+test('mutation guard accepts the public origin forwarded by Railway and rejects mismatched forwarded origins', async () => {
+  const publicOrigin = 'https://anime.example';
+  const proxiedRequest = headers => new Request('http://internal:8080/api/auth/register', {
+    method: 'POST',
+    headers: {'Origin': publicOrigin, 'Content-Type': 'application/json', ...headers},
+    body: '{}',
+  });
+  await enforceMutation(proxiedRequest({'X-Forwarded-Host': 'anime.example', 'X-Forwarded-Proto': 'https'}));
+  await rejectsStatus(async () => enforceMutation(proxiedRequest({'X-Forwarded-Host': 'other.example', 'X-Forwarded-Proto': 'https'})), 403);
+  await rejectsStatus(async () => enforceMutation(proxiedRequest({'X-Forwarded-Host': 'anime.example', 'X-Forwarded-Proto': 'http'})), 403);
+});
+
 test('mutation guard requires a write method and genuine JSON Content-Type', async () => {
   await rejectsStatus(async () => enforceMutation(request({}, { method: 'GET' })), 405);
   for (const type of [null, 'text/plain', 'application/x-www-form-urlencoded', 'application/jsonp', 'application/json.evil']) {
@@ -415,3 +427,4 @@ test('streamed JSON is bounded without relying on a Content-Length header', asyn
   });
   await rejectsStatus(() => readJsonMutation(req, 64), 413);
 });
+
