@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  ...(process.env.ANIME_RAILWAY_BUILD === "1" ? { output: "standalone" } : {}),
 };
 
 export default nextConfig;
+
