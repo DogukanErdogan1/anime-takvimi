@@ -8,10 +8,8 @@
 .vinext
 .next
 dist
-build
 node_modules
 output
 outputs
 tmp
 *.log
-
