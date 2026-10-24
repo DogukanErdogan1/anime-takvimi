@@ -440,3 +440,5 @@ html[data-theme=dark] :is(.at-watch-status-trigger,.at-watch-status-option)[data
   .exp-watchlist .at-library-edit-details > summary { gap:5px; padding:8px; font-size:11px; }
   .exp-watchlist .at-library-edit-details > summary > svg:first-child { display:none; }
 }
+
+.exp-hero-cover .exp-poster-fallback { padding:6px; font-size:10px; line-height:1.4; overflow-wrap:anywhere; overflow:hidden; }

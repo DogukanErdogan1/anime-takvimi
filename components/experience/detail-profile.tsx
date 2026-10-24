@@ -94,11 +94,27 @@ function allItems(snapshot: Snapshot, library: Library = snapshot.library): Anim
   for (const item of [...snapshot.catalog, ...snapshot.schedule, ...Object.values(library.savedAnime)]) if (item?.id) index.set(item.id, item);
   return [...new Set([...library.saved, ...Object.keys(library.tracking || {}), ...(library.favorites || []), ...(library.collections || []).flatMap(collection => collection.animeIds)])].map(id => index.get(id)).filter((item): item is Anime => Boolean(item));
 }
-function Poster({ item, className = '' }: {item: Anime; className?: string}) {
-  const source = imageUrl(item.image);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [source]);
-  return <span className={`at-poster ${className}`}>{source && !failed ? <img src={source} alt={`${item.title} afişi`} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)}/> : <span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
+export function AnimePoster({item,className='at-poster',showTitle=false}:{item:Anime;className?:string;showTitle?:boolean}) {
+  const primary=imageUrl(item.image),key=`${item.malId}:${primary||''}`;
+  const [failed,setFailed]=useState<{key:string;urls:string[]}>({key,urls:[]});
+  const [cover,setCover]=useState<{key:string;url:string|null}>({key,url:null});
+  const failures=failed.key===key?failed.urls:[];
+  const needsFallback=!primary||failures.includes(primary);
+  const alternate=cover.key===key?cover.url:null;
+  const source=!needsFallback?primary:alternate&&!failures.includes(alternate)?alternate:null;
+  useEffect(()=>{
+    if(!needsFallback || !Number.isSafeInteger(item.malId) || item.malId<1)return;
+    let active=true;
+    const provider=window.AnimeBanners;
+    if(provider?.resolvePoster)provider.resolvePoster(item.malId).then(value=>{
+      if(active)setCover({key,url:provider.safePoster(value)});
+    }).catch(()=>{});
+    return()=>{active=false;};
+  },[key,needsFallback,item.malId]);
+  return <span className={className}>{source?<img key={source} src={source} alt={showTitle?item.title:`${item.title} afişi`} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>({key,urls:[...new Set([...(previous.key===key?previous.urls:[]),source])]}))}/>:showTitle?<span className="exp-poster-fallback">{item.title}</span>:<span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
+}
+function Poster({item,className=''}:{item:Anime;className?:string}) {
+  return <AnimePoster item={item} className={`at-poster ${className}`}/>;
 }
 
 function ProfileCardArtwork({item}:{item:Anime}) {

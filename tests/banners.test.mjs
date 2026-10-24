@@ -149,3 +149,43 @@ test('missing or failing automatic art returns null and caches the failure',asyn
   assert.equal(await api.resolve(21),null);assert.equal(await api.resolve(21),null);assert.equal(calls,2);
   assert.equal(await api.resolve('../21'),null);
 });
+
+
+const COVER='https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-example.jpg';
+test('poster fallback batches and deduplicates MAL identifiers, then reuses validated covers',async()=>{
+  const calls=[];
+  const {AnimeBanners:api,cache}=client(async(url,options)=>{
+    calls.push([url,options]);
+    return json({data:{p21:{idMal:21,coverImage:{extraLarge:COVER}},p22:{idMal:22,coverImage:{extraLarge:'https://evil.example/a.jpg',large:COVER.replace('bx21','bx22')}}}});
+  });
+  const result=await Promise.all([api.resolvePoster(21),api.resolvePoster(22),api.resolvePoster(21)]);
+  assert.deepEqual(result,[COVER,COVER.replace('bx21','bx22'),COVER]);
+  assert.equal(calls.length,1);assert.equal(calls[0][0],'https://graphql.anilist.co');
+  assert.equal(calls[0][1].credentials,'omit');
+  const query=JSON.parse(calls[0][1].body).query;
+  assert.equal((query.match(/Media\(/g)||[]).length,2);assert.match(query,/idMal: 21/);assert.match(query,/coverImage/);
+  assert.equal(await api.resolvePoster(21),COVER);assert.equal(calls.length,1);
+  assert.equal(JSON.parse(cache.get('anime-takvimi-posters-v1:21')).value,COVER);
+});
+
+test('poster fallback validates raster URLs, matching IDs, poisoned cache entries and rate-limit failures',async()=>{
+  let calls=0;
+  const {AnimeBanners:api}=client(async()=>{calls++;return json({data:{p21:{idMal:22,coverImage:{extraLarge:COVER}}}});},{'anime-takvimi-posters-v1:21':JSON.stringify({value:'https://evil.example/a.jpg',expires:Date.now()+10000})});
+  for(const value of ['https://evil.example/a.jpg',COVER+'?x=1',COVER+'#x',COVER.replace('.jpg','.svg'),COVER.replace('s4.anilist.co','s4.anilist.co.evil.example'),COVER.replace('https:','http:'),COVER.replace('/cover/large/','/banner/')])assert.equal(api.safePoster(value),null);
+  assert.equal(api.safePoster(COVER),COVER);
+  assert.equal(await api.resolvePoster('../21'),null);assert.equal(calls,0);
+  assert.equal(await api.resolvePoster(21),null);assert.equal(await api.resolvePoster(21),null);assert.equal(calls,1);
+  let failures=0;
+  const failing=client(async()=>{failures++;return new Response('',{status:429});}).AnimeBanners;
+  assert.equal(await failing.resolvePoster(22),null);assert.equal(await failing.resolvePoster(22),null);assert.equal(failures,1);
+});
+
+test('large poster batches stay bounded and map every result to its own MAL anime',async()=>{
+  const sizes=[];
+  const {AnimeBanners:api}=client(async(_url,options)=>{
+    const ids=[...JSON.parse(options.body).query.matchAll(/idMal: (\d+)/g)].map(match=>Number(match[1]));sizes.push(ids.length);
+    return json({data:Object.fromEntries(ids.map(id=>['p'+id,{idMal:id,coverImage:{large:COVER.replace('bx21','bx'+id)}}]))});
+  });
+  const ids=Array.from({length:26},(_,index)=>index+1),result=await Promise.all(ids.map(id=>api.resolvePoster(id)));
+  assert.deepEqual(sizes,[12,12,2]);assert.deepEqual(result,ids.map(id=>COVER.replace('bx21','bx'+id)));
+});

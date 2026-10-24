@@ -124,3 +124,9 @@ html[data-palette] .exp-discovery-copy .exp-recommendation-title {padding-top:0;
 @media(max-width:640px) {
   html[data-palette] .exp-personal-strip {padding-top:24px;}
 }
+
+/* Broadcast panels use the selected palette for every text level. */
+html[data-palette] .exp-today :is(.exp-today-empty,.exp-today-link small),
+html[data-palette] .exp-today > div:first-child > a { color:var(--muted); }
+html[data-palette] .exp-today-empty > a { color:var(--coral); }
+html[data-palette] .exp-today h2 { color:var(--ink); }

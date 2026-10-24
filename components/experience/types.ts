@@ -49,6 +49,6 @@ declare global {
       searchAnime: (query:string,options?:{signal?:AbortSignal}) => Promise<{anime:Anime[];fetchedAt:number;cached:boolean;source:string}>;
       getDetails: (malId:number,options?:{signal?:AbortSignal}) => Promise<AnimeDetails>;
     };
-    AnimeBanners?: {resolve: (id:number) => Promise<string|null>; safeBanner: (value:unknown,id?:number) => string|null};
+    AnimeBanners?: {resolve: (id:number) => Promise<string|null>; safeBanner: (value:unknown,id?:number) => string|null; resolvePoster: (id:number) => Promise<string|null>; safePoster: (value:unknown) => string|null};
   }
 }

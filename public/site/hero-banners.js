@@ -45,6 +45,59 @@
       return cacheAutomatic(id,value,value ? 24*60*60*1000 : 6*60*60*1000);
     } catch { return cacheAutomatic(id,null,5*60*1000); }
   }
+  const POSTER_PREFIX = 'anime-takvimi-posters-v1:';
+  const posterCache = new Map(), posterPending = new Map();
+  let posterTimer = null;
+  function safePoster(value) {
+    if(typeof value !== 'string' || value.length > 2048)return null;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && !url.username && !url.password && !url.port && !url.search && !url.hash && url.hostname === 's4.anilist.co' && /^\/file\/anilistcdn\/media\/anime\/cover\/(?:large|medium)\/[A-Za-z0-9_.-]+\.(?:jpe?g|png|webp)$/.test(url.pathname) ? url.href : null;
+    } catch {return null;}
+  }
+  function cachedPoster(id) {
+    let entry=posterCache.get(id);
+    if(!entry)try {entry=JSON.parse(localStorage.getItem(POSTER_PREFIX+id)||'null');}catch {}
+    const now=Date.now();
+    if(entry && Number.isFinite(entry.expires) && entry.expires>now && entry.expires<=now+24*60*60*1000 && (entry.value===null || safePoster(entry.value)))return entry;
+    return null;
+  }
+  function cachePoster(id,value,ttl) {
+    const entry={value,expires:Date.now()+ttl};posterCache.set(id,entry);
+    try {localStorage.setItem(POSTER_PREFIX+id,JSON.stringify(entry));}catch {}
+    return value;
+  }
+  async function flushPosters() {
+    posterTimer=null;
+    const batch=[...posterPending].filter(([,job])=>!job.started).slice(0,12);
+    if(!batch.length)return;
+    for(const [,job] of batch)job.started=true;
+    try {
+      const query='query PosterFallback { '+batch.map(([id])=>`p${id}: Media(idMal: ${id}, type: ANIME) { idMal coverImage { extraLarge large } }`).join(' ')+' }';
+      const response=await timedFetch('https://graphql.anilist.co',{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query})});
+      if(!response.ok)throw new Error('poster_request_failed');
+      const payload=await response.json();
+      for(const [id,job] of batch) {
+        const media=payload.data?.['p'+id];
+        const value=media?.idMal===id ? safePoster(media.coverImage?.extraLarge)||safePoster(media.coverImage?.large) : null;
+        const ttl=value ? 24*60*60*1000 : media===null && !payload.errors ? 6*60*60*1000 : 60*1000;
+        job.resolve(cachePoster(id,value,ttl));
+      }
+    } catch {for(const [id,job] of batch)job.resolve(cachePoster(id,null,60*1000));}
+    finally {
+      for(const [id] of batch)posterPending.delete(id);
+      if([...posterPending.values()].some(job=>!job.started) && posterTimer===null)posterTimer=setTimeout(flushPosters,100);
+    }
+  }
+  function resolvePoster(value) {
+    const id=idOf(value);if(!id)return Promise.resolve(null);
+    const cached=cachedPoster(id);if(cached)return Promise.resolve(cached.value);
+    if(posterPending.has(id))return posterPending.get(id).promise;
+    let finish;const promise=new Promise(resolve=>{finish=resolve;});
+    posterPending.set(id,{promise,resolve:finish,started:false});
+    if(posterTimer===null && ![...posterPending.values()].some(job=>job.started))posterTimer=setTimeout(flushPosters,60);
+    return promise;
+  }
   async function overrideBanner(id,generation) {
     const cached = overrides.get(id);
     if (cached && cached.expires > Date.now()) return cached.value;
@@ -81,7 +134,7 @@
     return payload;
   }
   window.AnimeBanners = Object.freeze({
-    resolve, invalidate, safeBanner,
+    resolve, invalidate, safeBanner, resolvePoster, safePoster,
     upload(value,file) {
       if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) return Promise.reject(new Error('PNG, JPEG veya WebP bir yatay görsel seçin.'));
       if (!file.size || file.size > 2*1024*1024) return Promise.reject(new Error('Banner en fazla 2 MB olabilir.'));

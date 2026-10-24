@@ -3,7 +3,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Bell,Bookmark,Check,ChevronRight,Compass,Heart,Plus,Search,Star,X} from 'lucide-react';
-import {AnimeDetail,ProfileView,ProfileLibraryEditor} from './detail-profile';
+import {AnimeDetail,ProfileView,ProfileLibraryEditor,AnimePoster} from './detail-profile';
 import {ExperienceControls} from './notifications';
 import CatalogFilters from './catalog-filters';
 import ThemePicker from './theme-picker';
@@ -24,9 +24,7 @@ function readSnapshot():ExperienceSnapshot {
   return {...data,ready:true,library:{...emptyLibrary,...data.library},account,loading:!!data.loading,error:data.error?'Anime verileri şu anda alınamıyor. Yeniden deneyebilirsin.':null,libraryLoading:!!member?.libraryLoading,blocked:!!member?.blocked||account?.user?.status==='suspended'};
 }
 function Poster({item,className=''}:{item:Anime;className?:string}) {
-  const [broken,setBroken]=useState(false);
-  useEffect(()=>setBroken(false),[item.image]);
-  return <span className={`exp-poster ${className}`}>{item.image&&!broken?<img src={item.image} alt={item.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setBroken(true)}/>:<span className="exp-poster-fallback">{item.title}</span>}</span>;
+  return <AnimePoster item={item} className={`exp-poster ${className}`} showTitle/>;
 }
 function useBanner(item:Anime|undefined){
   const [banner,setBanner]=useState<string|null>(null);

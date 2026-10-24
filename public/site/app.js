@@ -260,7 +260,7 @@
 
   function chips(item, limit = Infinity) { return item.genres.slice(0, limit).map(genre => `<span class="genre-chip">${escape(genre)}</span>`).join(''); }
   function poster(item, { eager = false } = {}) {
-    return `${item.image ? `<img src="${escape(item.image)}" alt="${escape(item.title)} posteri" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="image-placeholder"${item.image ? ' hidden' : ''}>${icon('bookmark')}<span>Poster bulunamadı</span></span>`;
+    return `${item.image ? `<img data-mal-poster="${item.malId}" src="${escape(item.image)}" alt="${escape(item.title)} posteri" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="image-placeholder"${item.image ? ' hidden' : ''}>${icon('bookmark')}<span>Poster bulunamadı</span></span>`;
   }
   function art(item, classes) { return `<div class="${classes} art remote-art">${poster(item)}</div>`; }
   function bookmarkButton(item) {
@@ -304,7 +304,7 @@
       const items = record?.anime || [];
       const current = state.libraryYear === today[0] && quarter === Math.floor((today[1]-1)/3);
       const message = record?.status === 'error' ? 'Afişler yüklenemedi' : record?.status === 'empty' ? 'Bu sezon için afiş bulunamadı' : 'Afişler yükleniyor…';
-      return `<div class="season-shelf-wrap"><button type="button" class="season-shelf season-shelf-${seasonKeys[quarter]}${current?' season-shelf-current':''}" data-season-year="${state.libraryYear}" data-season-quarter="${quarter}" aria-label="${state.libraryYear} ${season} sezonunun animelerini aç"><span class="season-shelf-art" aria-hidden="true">${items.length?`<span class="season-poster-backdrop remote-art"><img src="${escape(items[0].image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span><span class="season-poster-stack" data-poster-count="${items.length}">${items.map((item,index)=>`<span class="season-preview-poster poster-${index} remote-art">${poster(item)}</span>`).join('')}</span>`:`<span class="season-preview-state">${icon('calendar')}<span>${message}</span></span>`}${current?'<span class="season-current-badge">GÜNCEL SEZON</span>':''}${record?.stale?'<span class="season-cache-badge">Son alınan afişler</span>':''}</span><span class="season-shelf-copy"><small>${ranges[quarter]}</small><strong class="season-shelf-title">${state.libraryYear} ${season}</strong></span><span class="season-shelf-footer"><span>Animeleri keşfet</span><span class="season-shelf-arrow">${icon('arrow-right')}</span></span></button>${record?.status==='error'?`<button type="button" class="season-preview-retry text-button" data-preview-retry="${quarter}" data-preview-year="${state.libraryYear}" aria-label="${state.libraryYear} ${season} afişlerini yeniden yükle">Afişleri yeniden yükle</button>`:''}</div>`;
+      return `<div class="season-shelf-wrap"><button type="button" class="season-shelf season-shelf-${seasonKeys[quarter]}${current?' season-shelf-current':''}" data-season-year="${state.libraryYear}" data-season-quarter="${quarter}" aria-label="${state.libraryYear} ${season} sezonunun animelerini aç"><span class="season-shelf-art" aria-hidden="true">${items.length?`<span class="season-poster-backdrop remote-art"><img data-mal-poster="${items[0].malId}" src="${escape(items[0].image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span><span class="season-poster-stack" data-poster-count="${items.length}">${items.map((item,index)=>`<span class="season-preview-poster poster-${index} remote-art">${poster(item)}</span>`).join('')}</span>`:`<span class="season-preview-state">${icon('calendar')}<span>${message}</span></span>`}${current?'<span class="season-current-badge">GÜNCEL SEZON</span>':''}${record?.stale?'<span class="season-cache-badge">Son alınan afişler</span>':''}</span><span class="season-shelf-copy"><small>${ranges[quarter]}</small><strong class="season-shelf-title">${state.libraryYear} ${season}</strong></span><span class="season-shelf-footer"><span>Animeleri keşfet</span><span class="season-shelf-arrow">${icon('arrow-right')}</span></span></button>${record?.status==='error'?`<button type="button" class="season-preview-retry text-button" data-preview-retry="${quarter}" data-preview-year="${state.libraryYear}" aria-label="${state.libraryYear} ${season} afişlerini yeniden yükle">Afişleri yeniden yükle</button>`:''}</div>`;
     }).join('');
     if (rail) {
       const start = Math.max(libraryMinYear, Math.min(state.libraryYear-2, libraryMaxYear-4));
@@ -321,7 +321,7 @@
     const headerArt = $('#season-library-art');
     if (headerArt) {
       const featured = seasonKeys.map(key => seasonPreviews.get(`${state.libraryYear}-${key}`)).find(record => record?.anime?.length);
-      headerArt.innerHTML = featured ? featured.anime.map(item => `<img src="${escape(item.image)}" alt="" decoding="async" referrerpolicy="no-referrer">`).join('') : '';
+      headerArt.innerHTML = featured ? featured.anime.map(item => `<img data-mal-poster="${item.malId}" src="${escape(item.image)}" alt="" decoding="async" referrerpolicy="no-referrer">`).join('') : '';
       headerArt.hidden = !featured;
     }
   }
@@ -686,7 +686,16 @@
     document.addEventListener('error', event => {
       if (event.target.tagName !== 'IMG') return;
       const container = event.target.closest('.remote-art, .hero-poster'); if (!container) return;
-      event.target.hidden = true; const placeholder = container.querySelector('.image-placeholder'); if (placeholder) placeholder.hidden = false;
+      const image=event.target;
+      image.hidden = true; const placeholder = container.querySelector('.image-placeholder'); if (placeholder) placeholder.hidden = false;
+      const malId=Number(image.dataset.malPoster),provider=window.AnimeBanners;
+      if(image.dataset.posterFallback || !Number.isSafeInteger(malId) || malId<1 || !provider?.resolvePoster)return;
+      image.dataset.posterFallback='true';
+      provider.resolvePoster(malId).then(value=>{
+        const source=provider.safePoster(value);
+        if(!source || !image.isConnected || Number(image.dataset.malPoster)!==malId)return;
+        image.src=source;image.hidden=false;if(placeholder)placeholder.hidden=true;
+      }).catch(()=>{});
     }, true);
     document.addEventListener('change', event => { const input = event.target.closest('[data-progress-id]'); if (input) setProgress(input.dataset.progressId, input.value); });
     document.addEventListener('click', event => {
