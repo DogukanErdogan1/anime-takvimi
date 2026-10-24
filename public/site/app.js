@@ -21,7 +21,7 @@
     saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], dialogId: null,
     catalog: [], catalogKey: null, catalogMeta: null, catalogLoading: false, catalogError: null, catalogProgress: '',
     schedule: [], scheduleMeta: null, scheduleLoading: false, scheduleError: null,
-    day: 0, todayDay: 0, week: [], todayKey: '', weekOffset: 0, mapSaved: false, mapQuery: ''
+    day: 0, todayDay: 0, week: [], todayKey: '', weekOffset: 0, mapSaved: false, mapQuery: '', mapFocusNow: false, mapPastOpen: false
   };
   let seasonRequest = 0;
   let scheduleRequest = 0;
@@ -284,7 +284,9 @@
   }
 
   function renderWeekly() {
-    return window.AnimeScheduleView.mount($('#card-grid'), {state,escape,icon,poster,days,shortDays});
+    const count = window.AnimeScheduleView.mount($('#card-grid'), {state,escape,icon,poster,days,shortDays,focusNow:state.mapFocusNow});
+    state.mapFocusNow = false;
+    return count;
   }
 
   function renderSeasonLibrary() {
@@ -610,6 +612,7 @@
     if (!['discover', 'seasons', 'schedule', 'watchlist'].includes(page)) return;
     window.dispatchEvent(new CustomEvent('anime:navigate',{detail:{page}}));
     state.page = page; state.query = ''; state.genre = 'all'; state.limit = 5;
+    if (page === 'schedule') { state.weekOffset = 0; updateDates(); state.day = state.todayDay; state.mapFocusNow = true; }
     if (page === 'seasons') { state.seasonsOpen = false; state.libraryYear = state.year; }
     try { history.replaceState(null, '', '#' + page); } catch (_) { /* Navigation also works without history access. */ }
     if ($('#search')) $('#search').value = '';
@@ -697,8 +700,10 @@
       if (button.dataset.seasonYear !== undefined) { openSeason(Number(button.dataset.seasonYear), Number(button.dataset.seasonQuarter)); return; }
       if (button.dataset.libraryYear !== undefined) { changeLibraryYear(state.libraryYear + Number(button.dataset.libraryYear)); return; }
       if (button.hasAttribute('data-library-back')) { state.seasonsOpen = false; renderPage(); window.scrollTo({top: 0, behavior: 'smooth'}); return; }
+      if (button.dataset.mapDay !== undefined) { const day=Number(button.dataset.mapDay); if (Number.isInteger(day) && day>=0 && day<7) { state.day=day; state.mapPastOpen=false; renderCatalog(); renderAside(); } return; }
+      if (button.hasAttribute('data-map-past')) { state.mapPastOpen=!state.mapPastOpen; renderCatalog(); return; }
       if (button.dataset.mapWeek !== undefined) { state.weekOffset = Math.max(-4, Math.min(4, state.weekOffset + Number(button.dataset.mapWeek))); updateDates(); renderPage(); return; }
-      if (button.hasAttribute('data-map-today')) { state.weekOffset = 0; updateDates(); state.day = state.todayDay; renderPage(); return; }
+      if (button.hasAttribute('data-map-today')) { state.weekOffset = 0; updateDates(); state.day = state.todayDay; state.mapFocusNow = true; state.mapPastOpen = false; renderPage(); return; }
       if (button.dataset.mapFilter) { state.mapSaved = button.dataset.mapFilter === 'saved'; renderCatalog(); renderAside(); return; }
       if (button.dataset.page) { changePage(button.dataset.page); return; }
       if (button.dataset.format) { state.format = button.dataset.format; state.limit = Infinity; renderPage(); return; }
@@ -733,7 +738,22 @@
     updateGenres(); renderPage();
     if (state.page !== 'seasons') loadSeason();
     if (state.page === 'schedule') loadSchedule();
-    setInterval(() => { const previous = state.todayKey; updateDates(); if (previous !== state.todayKey) { renderPage(); if (state.page === 'schedule') loadSchedule(); } else { if (state.page === 'schedule') renderCatalog(); renderAside(); } }, 60000);
+    let clockMinute = Math.floor(Date.now() / 60000);
+    const syncClock = () => {
+      if (document.hidden) return;
+      const minute = Math.floor(Date.now() / 60000);
+      if (minute === clockMinute) return;
+      clockMinute = minute;
+      const previous = state.todayKey;
+      updateDates();
+      if (previous !== state.todayKey) { renderPage(); if (state.page === 'schedule') loadSchedule(); }
+      else { if (state.page === 'schedule') renderCatalog(); renderAside(); }
+    };
+    setInterval(syncClock, 1000);
+    document.addEventListener('visibilitychange', syncClock);
+    window.addEventListener('focus', syncClock);
+    const agendaLayout = window.matchMedia?.('(max-width: 900px)');
+    agendaLayout?.addEventListener('change', () => { if (state.page === 'schedule') { state.mapFocusNow = true; renderCatalog(); } });
     window.animeTakvimi = {
       getState: () => ({ page: state.page, season: selectedKey(), saved: [...state.saved], reminders: [...state.reminders], progress: { ...state.progress }, view: state.view, catalogCount: state.catalog.length, scheduleCount: state.schedule.length, libraryYear: state.libraryYear, seasonsOpen: state.seasonsOpen, format: state.format, accountScope }),
       getLibrarySnapshot, setAccountScope, setGuestScope, replaceLibrarySnapshot, refreshView: refresh,

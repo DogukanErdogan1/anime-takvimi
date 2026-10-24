@@ -16,9 +16,16 @@ function compile(name,source){const file=resolve(runtime,`experience-render-${na
 for(const dependency of ['model','reminder-logic'])compile(dependency,readFileSync(new URL(`../components/experience/${dependency}.ts`,import.meta.url),'utf8'));
 compile('watch-status-select',readFileSync(new URL('../components/experience/watch-status-select.tsx',import.meta.url),'utf8'));
 compile('catalog-filters',readFileSync(new URL('../components/experience/catalog-filters.tsx',import.meta.url),'utf8'));
+const profileSource=readFileSync(new URL('../components/experience/detail-profile.tsx',import.meta.url),'utf8')
+  .replace(/import \{AvatarFrame\} from '\.\/avatar-frame';/,'const AvatarFrame=()=>null;')
+  .replace(/import AvatarFramePicker from '\.\/avatar-frame-picker';/,'const AvatarFramePicker=()=>null;')
+  .replace("from '../../lib/avatar-frames.mjs'",`from '${new URL('../lib/avatar-frames.mjs',import.meta.url).href}'`)
+  .replace("from './model'",`from './experience-render-model-${process.pid}.mjs'`)
+  .replace("from './watch-status-select'",`from './experience-render-watch-status-select-${process.pid}.mjs'`);
+compile('detail-profile',profileSource);
 const experienceSource=readFileSync(new URL('../components/experience/experience.tsx',import.meta.url),'utf8');
 const source=experienceSource
-  .replace(/import \{AnimeDetail,ProfileView\} from '\.\/detail-profile';/,'const AnimeDetail=()=>null,ProfileView=()=>null;')
+  .replace("from './detail-profile'",`from './experience-render-detail-profile-${process.pid}.mjs'`)
   .replace(/import \{ExperienceControls\} from '\.\/notifications';/,'const ExperienceControls=()=>null;')
   .replace(/import ThemePicker from '\.\/theme-picker';/,'const ThemePicker=()=>null;')
   .replace(/import AccountAvatarFrames from '\.\/account-avatar-frames';/,'const AccountAvatarFrames=()=>null;')
@@ -96,7 +103,8 @@ test('watchlist renders persisted status, favorite and bounded completion action
   assert.match(statusTrigger(html),/data-watch-status="completed"/);
   assert.doesNotMatch(statusTrigger(html),/disabled=""/);
   assert.match(html,/12 \/ 12 bölüm/);
-  assert.match(html,/class="exp-text-button" disabled=""/);
+  const increment=html.match(/<button\b[^>]*aria-label="API anime 401: bölüm sayısını artır"[^>]*>/)?.[0];
+  assert.ok(increment);assert.match(increment,/disabled=""/);
   assert.match(html,/href="#profile"/);
   assert.match(html,/aria-label="Listeyi filtrele"/);
   for(const label of ['İzliyorum','İzleyeceğim','Tamamladım','Bıraktım'])assert.ok(html.includes(label));
@@ -110,8 +118,8 @@ test('watchlist distinguishes empty guest, account loading and blocked mutation 
   assert.doesNotMatch(loading,/Burada yeni hikâyelere yer var/);
   const anime=item(402);
   const blocked=render(Watchlist,snapshot({blocked:true,library:library({saved:[anime.id],savedAnime:{[anime.id]:anime}})}));
-  assert.match(statusTrigger(blocked),/disabled=""/);
-  assert.match(blocked,/class="exp-text-button" disabled=""/);
+  assert.doesNotMatch(blocked,/at-library-editor|izleme bilgilerini düzenle|izlediğin bölüm sayısı/);
+  assert.match(blocked,/İzleyeceğim/);
 });
 
 test('React portals have exactly one matching slot in both static and server page markup',()=>{
@@ -121,4 +129,30 @@ test('React portals have exactly one matching slot in both static and server pag
   const staticBody=html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1].trim();
   assert.equal(serverBody,staticBody);
   for(const name of ['home','page','nav'])assert.equal((staticBody.match(new RegExp(`id="experience-${name}-slot"`,'g'))||[]).length,1);
+});
+
+
+test('watchlist renders the real shared favorite, status and episode editor for each anime',()=>{
+  const anime=item(501),unknown=item(502,{episodes:null});
+  const data=library({saved:[anime.id,unknown.id],savedAnime:{[anime.id]:anime,[unknown.id]:unknown},progress:{[anime.id]:4},tracking:{[anime.id]:'watching'},favorites:[anime.id]});
+  const html=render(Watchlist,snapshot({library:data}));
+  for(const entry of [anime,unknown]){
+    assert.ok(html.includes(entry.title+': izleme bilgilerini düzenle'));
+    assert.ok(html.includes(entry.title+': izleme durumu'));
+    assert.ok(html.includes(entry.title+': izlediğin bölüm sayısı'));
+  }
+  assert.match(html,/API anime 501: favorilerden çıkar" aria-pressed="true"/);
+  assert.match(html,/API anime 502: favorilere ekle" aria-pressed="false"/);
+  assert.match(html,/4 \/ 12 bölüm/);assert.match(html,/0 \/ \? bölüm/);
+  assert.match(html,/Favoriler <span>1<\/span>/);
+  assert.match(html,/data-watch-status="watching"/);
+  assert.match(html,/Değişiklikler otomatik kaydedilir/);
+});
+
+test('watchlist does not expose editing before readiness or for suspended accounts',()=>{
+  const anime=item(503),data=library({saved:[anime.id],savedAnime:{[anime.id]:anime}});
+  for(const state of [snapshot({ready:false,library:data}),snapshot({library:data,account:{authenticated:true,registered:true,user:{id:'suspended',status:'suspended'}}})]){
+    const html=render(Watchlist,state);
+    assert.doesNotMatch(html,/at-library-editor|izleme bilgilerini düzenle/);
+  }
 });

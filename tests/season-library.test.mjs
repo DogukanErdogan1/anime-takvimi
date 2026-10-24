@@ -6,18 +6,16 @@ import {runInNewContext} from 'node:vm';
 const source=readFileSync(new URL('../public/site/app.js',import.meta.url),'utf8');
 const staticHtml=readFileSync(new URL('../public/site/index.html',import.meta.url),'utf8');
 const fixedTime=Date.parse('2026-10-16T09:00:00Z');
-class FixedDate extends Date {
-  constructor(...args){super(...(args.length?args:[fixedTime]));}
-  static now(){return fixedTime;}
-}
 const anime=(id,format='TV')=>({id:`mal-${id}`,malId:id,title:`Anime ${id}`,format,image:`https://cdn.myanimelist.net/images/anime/1/${id}.jpg`,genres:['Aksiyon'],synonyms:[],studio:'Test Studio',airing:false,broadcastLocal:false});
 const response=items=>({anime:items,fetchedAt:fixedTime,stale:false});
 const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
 const countCards=html=>(html.match(/class="anime-card(?: |")/g)||[]).length;
 
-function setup({hash='',loadSeason=async()=>response([]),getSeasonPreview=async()=>response([])}={}){
-  const nodes=new Map(),listeners=new Map(),windowListeners=new Map(),requests=[],previewRequests=[],mapCalls=[];
-  const document={readyState:'complete',activeElement:null,body:{dataset:{}}};
+function setup({hash='',now=fixedTime,loadSeason=async()=>response([]),getSeasonPreview=async()=>response([])}={}){
+  const nodes=new Map(),listeners=new Map(),windowListeners=new Map(),requests=[],previewRequests=[],mapCalls=[],mapSnapshots=[],scheduleRequests=[],intervals=[],layoutListeners=[];
+  const clock={now};
+  class ClockDate extends Date { constructor(...args){super(...(args.length?args:[clock.now]));} static now(){return clock.now;} }
+  const document={readyState:'complete',hidden:false,activeElement:null,body:{dataset:{}}};
   class Element {
     constructor(id='',tagName='DIV'){
       this.id=id;this.tagName=tagName;this.dataset={};this.attributes=new Map();this.listeners=new Map();
@@ -53,25 +51,31 @@ function setup({hash='',loadSeason=async()=>response([]),getSeasonPreview=async(
     addEventListener(type,handler){const group=windowListeners.get(type)||[];group.push(handler);windowListeners.set(type,group);},
     dispatchEvent(event){for(const handler of windowListeners.get(event.type)||[])handler(event);},
     scrollTo(){},
+    matchMedia(){return {addEventListener(type,handler){if(type==='change')layoutListeners.push(handler);}};},
     AnimeData:{
       loadSeason(year,season,options){requests.push({year,season,options});return loadSeason(year,season,options);},
       getSeasonPreview(year,season,options){previewRequests.push({year,season,options});return getSeasonPreview(year,season,options);},
-      getSchedule:async()=>response([]),
+      getSchedule:async()=>{scheduleRequests.push(clock.now);return response([]);},
     },
-    AnimeScheduleView:{mount(target){if(target)mapCalls.push(target.id);return 0;}},
+    AnimeScheduleView:{mount(target,{state,focusNow}){if(target){mapCalls.push(target.id);mapSnapshots.push({week:state.week.map(date=>date.toISOString().slice(0,10)),day:state.day,weekOffset:state.weekOffset,mapPastOpen:state.mapPastOpen,focusNow});}return 0;}},
   };
   const storage=new Map();
-  const context={window,document,location,Date:FixedDate,Intl,URL,AbortController,DOMException,console,
+  const context={window,document,location,Date:ClockDate,Intl,URL,AbortController,DOMException,console,
     CustomEvent:class{constructor(type,options={}){this.type=type;this.detail=options.detail;}},
     history:{replaceState(_state,_title,value){location.hash=value;}},
     localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
-    setInterval(){return 1;},setTimeout(){return 1;},clearTimeout(){},
+    setInterval(handler){intervals.push(handler);return intervals.length;},setTimeout(){return 1;},clearTimeout(){},
   };
   runInNewContext(source,context,{filename:'app.js'});
   function dispatch(type,target){const event={type,target,preventDefault(){},key:''};for(const handler of target.listeners.get(type)||[])handler(event);for(const handler of listeners.get(type)||[])handler(event);}
   const click=(dataset={},attributes=[])=>{const button=new Element('','BUTTON');button.dataset={...dataset};for(const attribute of attributes)button.setAttribute(attribute,'');dispatch('click',button);};
   const change=(id,value)=>{const node=nodes.get(id);assert.ok(node,`actual markup must include #${id}`);node.value=String(value);dispatch('change',node);};
-  return {window,document,nodes,requests,previewRequests,mapCalls,click,change,state:()=>window.animeTakvimi.getState()};
+  return {window,document,nodes,requests,previewRequests,mapCalls,mapSnapshots,scheduleRequests,click,change,state:()=>window.animeTakvimi.getState(),
+    advanceTo(value,{tick=true}={}){clock.now=Date.parse(value);if(tick)for(const handler of intervals)handler();},
+    setHidden(hidden){document.hidden=hidden;for(const handler of listeners.get('visibilitychange')||[])handler({type:'visibilitychange'});},
+    focus(){window.dispatchEvent({type:'focus'});},
+    resizeLayout(){for(const handler of layoutListeners)handler({type:'change'});},
+  };
 }
 
 test('seasons navigation opens the four-quarter library instead of the catalog or weekly map',async()=>{
@@ -278,4 +282,75 @@ test('old cached preview timestamps do not cause an automatic fetch-and-render l
   assert.equal(ui.previewRequests.length,4,'one fetch per quarter is enough even when the API serves old cached images');
   assert.match(ui.nodes.get('season-shelves').innerHTML,/Son alınan afişler/);
   assert.ok(ui.nodes.get('season-shelves').innerHTML.includes(anime(990).image));
+});
+
+
+test('schedule clock refreshes at the next minute without rerendering every second',async()=>{
+  const ui=setup({hash:'#schedule',now:Date.parse('2026-10-16T14:15:59Z')});await flush();
+  const before=ui.mapSnapshots.length;
+  ui.advanceTo('2026-10-16T14:16:00Z');
+  assert.equal(ui.mapSnapshots.length,before+1);
+  ui.advanceTo('2026-10-16T14:16:20Z');
+  assert.equal(ui.mapSnapshots.length,before+1);
+  assert.equal(ui.scheduleRequests.length,1,'minute ticks do not refetch the weekly feed');
+});
+
+test('returning to a hidden calendar resyncs the Istanbul date and week after midnight',async()=>{
+  const ui=setup({hash:'#schedule',now:Date.parse('2026-10-18T20:59:00Z')});await flush();
+  assert.equal(ui.mapSnapshots.at(-1).week[0],'2026-10-12');
+  const before=ui.mapSnapshots.length;
+  ui.setHidden(true);ui.advanceTo('2026-10-18T21:05:00Z');
+  assert.equal(ui.mapSnapshots.length,before);
+  ui.setHidden(false);await flush();
+  assert.equal(ui.mapSnapshots.at(-1).week[0],'2026-10-19');
+  assert.equal(ui.mapSnapshots.at(-1).day,0);
+  assert.equal(ui.scheduleRequests.length,2);
+});
+
+test('the now button and reopening the calendar request the actual current week and time',async()=>{
+  const ui=setup({hash:'#schedule'});await flush();
+  ui.click({mapWeek:'1'});
+  assert.equal(ui.mapSnapshots.at(-1).weekOffset,1);
+  ui.click({},['data-map-today']);
+  assert.equal(ui.mapSnapshots.at(-1).weekOffset,0);
+  assert.equal(ui.mapSnapshots.at(-1).focusNow,true);
+  ui.click({page:'discover'});await flush();
+  ui.advanceTo('2026-10-19T07:00:00Z',{tick:false});
+  ui.click({page:'schedule'});
+  assert.equal(ui.mapSnapshots.at(-1).week[0],'2026-10-19');
+  assert.equal(ui.mapSnapshots.at(-1).day,0);
+  assert.equal(ui.mapSnapshots.at(-1).focusNow,true);
+});
+
+test('window focus catches up after the device clock advances while timers are paused',async()=>{
+  const ui=setup({hash:'#schedule'});await flush();
+  const before=ui.mapSnapshots.length;
+  ui.advanceTo('2026-10-16T15:45:00Z',{tick:false});
+  ui.focus();
+  assert.equal(ui.mapSnapshots.length,before+1);
+});
+
+
+test('agenda day selection and the elapsed toggle stay interactive through a minute refresh',async()=>{
+  const ui=setup({hash:'#schedule'});await flush();
+  ui.click({mapDay:'2'});
+  assert.equal(ui.mapSnapshots.at(-1).day,2);
+  ui.click({},['data-map-past']);
+  assert.equal(ui.mapSnapshots.at(-1).mapPastOpen,true);
+  ui.advanceTo('2026-10-16T09:01:00Z');
+  assert.equal(ui.mapSnapshots.at(-1).day,2);
+  assert.equal(ui.mapSnapshots.at(-1).mapPastOpen,true);
+  ui.click({mapDay:'5'});
+  assert.equal(ui.mapSnapshots.at(-1).day,5);
+  assert.equal(ui.mapSnapshots.at(-1).mapPastOpen,false);
+  ui.click({mapDay:'99'});
+  assert.equal(ui.mapSnapshots.at(-1).day,5);
+});
+
+test('switching between touch and desktop layout repositions the map without requesting data again',async()=>{
+  const ui=setup({hash:'#schedule'});await flush();
+  const requests=ui.scheduleRequests.length;
+  ui.resizeLayout();
+  assert.equal(ui.mapSnapshots.at(-1).focusNow,true);
+  assert.equal(ui.scheduleRequests.length,requests);
 });

@@ -20,10 +20,12 @@
   function valid(item) {
     return item?.airing === true && item.broadcastLocal === true && Number.isInteger(item.day) && item.day>=0 && item.day<7 && minutes(item.time)!==null;
   }
-  function layout(items) {
+  function layout(items, {currentMinute = null} = {}) {
     const seen = new Set();
     const entries = items.filter(valid).filter(item=>{if(seen.has(item.id))return false;seen.add(item.id);return true;});
-    const start = entries.length ? Math.min(720,Math.floor(Math.min(...entries.map(item=>minutes(item.time)))/120)*120) : 720;
+    const firstBroadcast = entries.length ? Math.min(...entries.map(item=>minutes(item.time))) : 720;
+    const focus = Number.isFinite(currentMinute) && currentMinute>=0 && currentMinute<1440 ? currentMinute : 720;
+    const start = Math.floor(Math.min(720,firstBroadcast,focus)/120)*120;
     const axisWidth = Math.max(900,(1440-start)*1.15), cardWidth=210, gap=10;
     const position = minute => (minute-start)/(1440-start)*axisWidth;
     const rows=Array.from({length:7},(_,day)=>{

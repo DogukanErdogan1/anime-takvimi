@@ -24,7 +24,7 @@ const profileSource=source
   .replace("from './watch-status-select'", `from './detail-profile-watch-status-test-${process.pid}.mjs'`);
 writeFileSync(compiled, ts.transpileModule(profileSource, {compilerOptions}).outputText);
 after(() => { for(const file of [compiled,modelCompiled,watchStatusCompiled]) try { unlinkSync(file); } catch {} });
-const { AnimeDetail, ProfileView, ProfileInsights, ProfileAnimeCard } = await import(pathToFileURL(compiled).href);
+const { AnimeDetail, ProfileView, ProfileInsights, ProfileAnimeCard, ProfileLibraryEditor, ProfileClassicAnimeCard } = await import(pathToFileURL(compiled).href);
 const item = {id:'mal-123',malId:123,title:'Test anime',original:'Test anime',image:'https://cdn.myanimelist.net/images/anime/1/123.jpg',genres:['Aksiyon'],episodes:12,rating:8.5,studio:'Studio',summary:'Hikâye özeti.',malUrl:'https://myanimelist.net/anime/123',format:'TV',members:1,day:null,time:null,broadcastLocal:false,airing:false,status:'Tamamlandı',year:2026};
 const library = () => ({saved:[],reminders:[],progress:{},view:'grid',savedAnime:{},tracking:{},scores:{},favorites:[],collections:[]});
 const snapshot = (patch={}) => ({ready:true,page:'discover',catalog:[item],schedule:[],library:library(),account:null,accountScope:null,loading:false,error:null,libraryLoading:false,blocked:false,...patch});
@@ -198,4 +198,68 @@ test('read-only library cards have no progress mutation controls and unsafe imag
   assert.equal(findElement(tree,node=>node.props?.className==='at-library-advance'),null);
   const html=renderToStaticMarkup(tree);
   assert.doesNotMatch(html,/attacker\.example/);assert.match(html,/Afiş bulunamadı/);
+});
+
+
+test('profile favorite toggle uses the latest library and preserves other lists',()=>{
+  let data={...library(),favorites:['other'],collections:[{id:'keep',title:'Keep',animeIds:['other']}]};
+  const tree=ProfileLibraryEditor({item,library:data,canEdit:true,onChange:patch=>{data={...data,...patch(data)};}});
+  const toggle=findElement(tree,node=>node.props?.className==='at-library-favorite-toggle');
+  toggle.props.onClick();
+  assert.deepEqual(data.favorites,['other',item.id]);
+  data={...data,favorites:[...data.favorites,'added-later']};
+  toggle.props.onClick();
+  assert.deepEqual(data.favorites,['other','added-later']);
+  assert.deepEqual(data.collections,[{id:'keep',title:'Keep',animeIds:['other']}]);
+  assert.equal(data.savedAnime[item.id].id,item.id);
+  assert.ok(data.saved.includes(item.id));
+});
+
+test('profile status editing fills completed episodes and preserves progress for other statuses',()=>{
+  let data={...library(),progress:{[item.id]:3,other:8}};
+  const tree=ProfileLibraryEditor({item,library:data,canEdit:true,onChange:patch=>{data={...data,...patch(data)};}});
+  const selector=findElement(tree,node=>node.type?.name==='WatchStatusSelect');
+  selector.props.onChange('completed');
+  assert.equal(data.tracking[item.id],'completed');assert.equal(data.progress[item.id],12);
+  for(const status of ['planned','watching','dropped']){
+    selector.props.onChange(status);
+    assert.equal(data.tracking[item.id],status);assert.equal(data.progress[item.id],12);
+  }
+  selector.props.onChange('invalid');assert.equal(data.tracking[item.id],'dropped');
+  assert.equal(data.progress.other,8);
+});
+
+test('profile progress editing handles stale clicks, completion, corrections and unknown episode limits',()=>{
+  let data={...library(),progress:{[item.id]:10,other:7}};
+  const onChange=patch=>{data={...data,...patch(data)};};
+  const tree=ProfileLibraryEditor({item,library:data,canEdit:true,onChange});
+  const plus=findElement(tree,node=>node.props?.['aria-label']===item.title+': bölüm sayısını artır');
+  const minus=findElement(tree,node=>node.props?.['aria-label']===item.title+': bölüm sayısını azalt');
+  const input=findElement(tree,node=>node.type==='input');
+  plus.props.onClick();plus.props.onClick();plus.props.onClick();
+  assert.equal(data.progress[item.id],12);assert.equal(data.tracking[item.id],'completed');
+  minus.props.onClick();assert.equal(data.progress[item.id],11);assert.equal(data.tracking[item.id],'watching');
+  input.props.onChange({target:{value:'-100'}});
+  assert.equal(data.progress[item.id],0);assert.equal(data.tracking[item.id],'planned');
+  input.props.onChange({target:{value:'6.7'}});assert.equal(data.progress[item.id],6);
+  input.props.onChange({target:{value:'NaN'}});assert.equal(data.progress[item.id],6);
+  assert.equal(data.progress.other,7);
+  const unknown=ProfileLibraryEditor({item:{...item,episodes:null},library:data,canEdit:true,onChange});
+  findElement(unknown,node=>node.type==='input').props.onChange({target:{value:'99999'}});
+  assert.equal(data.progress[item.id],9999);assert.equal(data.tracking[item.id],'watching');
+});
+
+test('both profile list designs expose direct editing only for editable libraries',()=>{
+  for(const component of [ProfileAnimeCard,ProfileClassicAnimeCard]){
+    for(const canEdit of [true,false]){
+      const tree=component({item,library:library(),canEdit,onChange(){},onOpenDetail(){}});
+      const html=renderToStaticMarkup(tree);
+      assert.equal(html.includes('izleme bilgilerini düzenle'),canEdit);
+      assert.equal(html.includes('favorilere ekle'),canEdit);
+      assert.equal(html.includes('izlediğin bölüm sayısı'),canEdit);
+      const detailButton=findElement(tree,node=>node.props?.className==='at-profile-anime');
+      if(detailButton)assert.equal(findElement(detailButton.props.children,node=>node.type==='button'),null);
+    }
+  }
+  assert.equal(ProfileLibraryEditor({item,library:library(),canEdit:false,onChange(){throw Error('read only');}}),null);
 });

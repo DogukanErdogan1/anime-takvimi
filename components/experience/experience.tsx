@@ -3,9 +3,8 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Bell,Bookmark,Check,ChevronRight,Compass,Heart,Plus,Search,Star,X} from 'lucide-react';
-import {AnimeDetail,ProfileView} from './detail-profile';
+import {AnimeDetail,ProfileView,ProfileLibraryEditor} from './detail-profile';
 import {ExperienceControls} from './notifications';
-import {WatchStatusSelect} from './watch-status-select';
 import CatalogFilters from './catalog-filters';
 import ThemePicker from './theme-picker';
 import AccountAvatarFrames from './account-avatar-frames';
@@ -77,9 +76,29 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
 }
 
 export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
-  const [tab,setTab]=useState<WatchStatus|'all'>('all');
-  const items=snapshot.library.saved.map(id=>snapshot.library.savedAnime[id]).filter(Boolean).filter(item=>tab==='all'||watchStatus(item,snapshot.library)===tab);
-  return <section className="exp-watchlist"><header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header><div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele"><button className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{snapshot.library.saved.length}</span></button>{statuses.map(status=><button key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}<a href="#profile">Profilim <ArrowRight size={14}/></a></div>{snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:items.length?<div className="exp-library-grid">{items.map(item=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{snapshot.library.favorites.includes(item.id)&&<span className="exp-favorite-badge"><Heart size={17} fill="currentColor"/></span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><div className="exp-status-select"><span>Durum</span><WatchStatusSelect disabled={snapshot.blocked} value={watchStatus(item,snapshot.library)} label={item.title+' izleme durumu'} onChange={value=>{onChange(current=>({tracking:{...current.tracking,[item.id]:value},...(value==='completed'&&item.episodes?{progress:{...current.progress,[item.id]:item.episodes}}:{})}));}}/></div><p className="exp-muted">{snapshot.library.progress[item.id]||0}{item.episodes?` / ${item.episodes}`:''} bölüm</p><button className="exp-text-button" disabled={snapshot.blocked||!!item.episodes&&(snapshot.library.progress[item.id]||0)>=item.episodes} onClick={()=>onChange(current=>advanceEpisode(item,current))}><Plus size={14}/> Bölüm izledim</button></article>)}</div>:<div className="exp-empty"><Bookmark size={34}/><h2>Burada yeni hikâyelere yer var.</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a></div>}</section>;
+  const [tab,setTab]=useState<WatchStatus|'all'|'favorites'>('all');
+  const library=snapshot.library;
+  const saved=library.saved.map(id=>library.savedAnime[id]).filter(Boolean);
+  const favorites=saved.filter(item=>library.favorites.includes(item.id));
+  const items=saved.filter(item=>tab==='all'||(tab==='favorites'?library.favorites.includes(item.id):watchStatus(item,library)===tab));
+  const editable=snapshot.ready&&!snapshot.blocked&&!snapshot.libraryLoading&&snapshot.account?.user?.status!=='suspended';
+  return <section className="exp-watchlist">
+    <header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header>
+    <div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele">
+      <button type="button" className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{saved.length}</span></button>
+      {statuses.map(status=><button type="button" key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}
+      <button type="button" className={tab==='favorites'?'active':''} aria-pressed={tab==='favorites'} onClick={()=>setTab('favorites')}><Heart size={13} aria-hidden="true"/> Favoriler <span>{favorites.length}</span></button>
+      <a href="#profile">Profilim <ArrowRight size={14}/></a>
+    </div>
+    {snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:items.length?<div className="exp-library-grid">
+      {items.map(item=><article key={item.id} aria-label={item.title}>
+        <button type="button" className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{library.favorites.includes(item.id)&&<span className="exp-favorite-badge" aria-label="Favori"><Heart size={17} fill="currentColor" aria-hidden="true"/></span>}</button>
+        <button type="button" className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button>
+        <div className="exp-library-summary"><span>{statuses.find(status=>status.id===watchStatus(item,library))!.label}</span><small>{library.progress[item.id]||0} / {item.episodes||'?'} bölüm</small></div>
+        <ProfileLibraryEditor item={item} library={library} canEdit={editable} onChange={onChange}/>
+      </article>)}
+    </div>:<div className="exp-empty"><Bookmark size={34}/><h2>{tab==='favorites'?'Favorilerin burada birikecek.':'Burada yeni hikâyelere yer var.'}</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':tab==='favorites'?'Listendeki kalbe dokunarak sevdiğin animeleri buraya ekleyebilirsin.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a></div>}
+  </section>;
 }
 function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapshot:ExperienceSnapshot;onDetail:(item:Anime)=>void}){
   const [query,setQuery]=useState('');

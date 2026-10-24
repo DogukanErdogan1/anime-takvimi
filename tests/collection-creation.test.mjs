@@ -27,7 +27,7 @@ const source=readFileSync(new URL('../components/experience/detail-profile.tsx',
 const componentFile=write('component',ts.transpileModule(source,{compilerOptions:options}).outputText);
 after(()=>{for(const file of files)try{unlinkSync(file);}catch{}});
 const hooks=await import(pathToFileURL(hooksFile).href);
-const {ProfileView}=await import(pathToFileURL(componentFile).href);
+const {ProfileView,ProfileLibraryEditor}=await import(pathToFileURL(componentFile).href);
 
 class SQLiteD1{
   constructor(){this.sqlite=new DatabaseSync(':memory:');this.sqlite.exec('PRAGMA foreign_keys=ON;');const root=new URL('../drizzle/',import.meta.url);for(const name of readdirSync(root).filter(name=>name.endsWith('.sql')).sort())this.sqlite.exec(readFileSync(new URL(name,root),'utf8'));}
@@ -177,4 +177,29 @@ test('a shrinking library clamps the last page immediately instead of showing an
   const list=find(tree,node=>node.props?.id==='at-library-page-items');
   assert.equal(list.props.children.length,1);assert.equal(list.props.children[0].props.item.id,'mal-6');
   assert.equal(find(tree,node=>node.props?.['aria-label']==='2. sayfa').props['aria-current'],'page');
+});
+
+
+test('profile list favorite and progress edits persist through the client bridge and database reload',async t=>{
+  const db=new SQLiteD1();t.after(()=>db.sqlite.close());
+  const membership=createMembershipService(db),identity={userId:'profile-editor-user',email:'profile-editor@example.test'};
+  await membership.register(identity,{displayName:'Profile editor'});
+  const item={id:'mal-123',malId:123,title:'List anime',image:'https://cdn.myanimelist.net/images/anime/1/123.jpg',episodes:12,genres:['Aksiyon']};
+  const ui=client();ui.bridge.setAccountScope(identity.userId,{...empty(),saved:[item.id],savedAnime:{[item.id]:item},progress:{[item.id]:3},collections:[{id:'keep',title:'Keep',animeIds:[item.id]}]});
+  const tree=ProfileLibraryEditor({item,library:clone(ui.bridge.getLibrarySnapshot()),canEdit:true,onChange:patch=>{
+    const current=ui.bridge.getLibrarySnapshot();ui.bridge.replaceLibrarySnapshot({...current,...patch(current)},{emit:true});
+  }});
+  find(tree,node=>node.props?.className==='at-library-favorite-toggle').props.onClick();
+  find(tree,node=>node.type?.name==='WatchStatusSelect').props.onChange('completed');
+  find(tree,node=>node.type==='input').props.onChange({target:{value:'9'}});
+  const submitted=clone(ui.bridge.getLibrarySnapshot());
+  assert.equal(submitted.tracking[item.id],'watching');assert.equal(submitted.progress[item.id],9);
+  assert.deepEqual(submitted.favorites,[item.id]);
+  assert.deepEqual(validateLibrary({library:submitted}),submitted);
+  await membership.putLibrary(identity,{library:submitted});
+  const saved=(await membership.getLibrary(identity)).library;
+  assert.deepEqual(saved,submitted);
+  const reloaded=client(ui.storage);reloaded.bridge.setAccountScope(identity.userId,saved);
+  assert.deepEqual(clone(reloaded.bridge.getLibrarySnapshot()),submitted);
+  assert.equal(ui.events.filter(event=>event.type==='anime:librarychange').length,3);
 });

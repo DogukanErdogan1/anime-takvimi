@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bell, Bookmark, Camera, Check, ChevronDown, CircleCheck, Clapperboard, Compass, ExternalLink, Eye, Heart, LayoutGrid, ListPlus, Minus, Pencil, Play, Plus, Settings, Shield, Star, StarHalf, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, Bookmark, Camera, Check, ChevronDown, CircleCheck, Clapperboard, Compass, ExternalLink, Eye, EyeOff, Heart, LayoutGrid, ListPlus, MessageCircle, Minus, Pencil, Play, Plus, Settings, Shield, Star, StarHalf, Trash2, X } from 'lucide-react';
 import type { Anime, Library, LibraryChange as Change, ExperienceSnapshot as Snapshot } from './types';
 import { advanceEpisode, watchStatus } from './model';
 import {WatchStatusSelect} from './watch-status-select';
@@ -14,6 +14,7 @@ const states = [
 ] as const;
 type TrackingStatus = typeof states[number][0];
 type Review = { id: string; userId: string; displayName: string; body: string; spoiler: boolean; score: number | null; createdAt: string };
+type ReviewPage = {reviews: Review[]; average: number | null; total: number};
 type Profile = { id: string; displayName: string; bio: string; isPublic: boolean; coverUrl?: string | null; avatarFrame?: string | null; createdAt?: string };
 type Details = { trailerUrl?: string | null; relations?: {id: number; title: string; url: string}[] };
 type ExperienceWindow = Window & {
@@ -119,6 +120,48 @@ function ProfileCardArtwork({item}:{item:Anime}) {
   return <div ref={target} className="at-library-art" aria-hidden="true">{source&&<img key={source} src={source} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>previous.includes(source)?previous:[...previous,source])}/>}</div>;
 }
 
+type ProfileLibraryItemProps = {item:Anime;library:Library;canEdit:boolean;onChange:Change};
+
+export function ProfileLibraryEditor({item,library,canEdit,onChange}:ProfileLibraryItemProps) {
+  if(!canEdit)return null;
+  const total=typeof item.episodes==='number'&&Number.isSafeInteger(item.episodes)&&item.episodes>0?item.episodes:null;
+  const limit=Math.min(total||9999,9999);
+  const safeCount=(value:number|undefined)=>typeof value==='number'&&Number.isFinite(value)?Math.min(limit,Math.max(0,Math.floor(value))):0;
+  const count=safeCount(library.progress[item.id]);
+  const favorite=library.favorites.includes(item.id);
+  const setStatus=(next:TrackingStatus)=>{
+    if(!canEdit||!states.some(([id])=>id===next))return;
+    onChange(current=>({...stored(current,item),tracking:{...current.tracking,[item.id]:next},...(next==='completed'&&total?{progress:{...current.progress,[item.id]:limit}}:{})}));
+  };
+  const setProgress=(next:number,relative=false)=>{
+    if(!canEdit||!Number.isFinite(next))return;
+    onChange(current=>{
+      const value=safeCount(relative?safeCount(current.progress[item.id])+next:next);
+      return {...stored(current,item),progress:{...current.progress,[item.id]:value},tracking:{...current.tracking,[item.id]:total&&value>=total?'completed':value>0?'watching':'planned'}};
+    });
+  };
+  return <div className="at-library-editor">
+    <button type="button" className={'at-library-favorite-toggle'+(favorite?' is-active':'')} aria-label={item.title+': '+(favorite?'favorilerden çıkar':'favorilere ekle')} aria-pressed={favorite} title={favorite?'Favorilerden çıkar':'Favorilere ekle'} onClick={()=>{
+      if(canEdit)onChange(current=>({...stored(current,item),favorites:current.favorites.includes(item.id)?current.favorites.filter(id=>id!==item.id):[...current.favorites,item.id]}));
+    }}><Heart size={17} fill={favorite?'currentColor':'none'} aria-hidden="true"/></button>
+    <details className="at-library-edit-details">
+      <summary aria-label={item.title+': izleme bilgilerini düzenle'}><Pencil size={14} aria-hidden="true"/><span>Düzenle</span><ChevronDown size={14} className="at-library-edit-chevron" aria-hidden="true"/></summary>
+      <div className="at-library-edit-panel">
+        <div className="at-library-edit-field"><span>İzleme durumu</span><WatchStatusSelect value={watchStatus(item,library)} label={item.title+': izleme durumu'} onChange={setStatus} compact/></div>
+        <div className="at-library-edit-field"><span>İzlediğin bölüm</span><span className="at-library-edit-stepper"><button type="button" disabled={count<=0} onClick={()=>setProgress(-1,true)} aria-label={item.title+': bölüm sayısını azalt'}><Minus size={14} aria-hidden="true"/></button><input type="number" min={0} max={limit} step={1} inputMode="numeric" value={count} onChange={event=>setProgress(Number(event.target.value))} aria-label={item.title+': izlediğin bölüm sayısı'}/><button type="button" disabled={count>=limit} onClick={()=>setProgress(1,true)} aria-label={item.title+': bölüm sayısını artır'}><Plus size={14} aria-hidden="true"/></button></span></div>
+        <small className="at-library-edit-note">Değişiklikler otomatik kaydedilir.</small>
+      </div>
+    </details>
+  </div>;
+}
+
+export function ProfileClassicAnimeCard({item,library,canEdit,onChange,onOpenDetail}:ProfileLibraryItemProps&{onOpenDetail:(item:Anime)=>void}) {
+  return <article className="at-profile-classic-item" aria-label={item.title}>
+    <button type="button" className="at-profile-anime" onClick={()=>onOpenDetail(item)}><Poster item={item}/><span className="at-profile-anime-name">{item.title}</span><small>{library.progress[item.id]||0} / {item.episodes||'?'} bölüm{library.scores?.[item.id]?' · ★ '+library.scores[item.id]:''}</small></button>
+    <ProfileLibraryEditor item={item} library={library} canEdit={canEdit} onChange={onChange}/>
+  </article>;
+}
+
 export function ProfileAnimeCard({item,library,canEdit,onChange,onOpenDetail}:{item:Anime;library:Library;canEdit:boolean;onChange:Change;onOpenDetail:(item:Anime)=>void}) {
   const total=typeof item.episodes==='number'&&Number.isSafeInteger(item.episodes)&&item.episodes>0?item.episodes:null;
   const safeCount=(value:number|undefined)=>typeof value==='number'&&Number.isFinite(value)?Math.min(9999,Math.max(0,Math.floor(value))):0;
@@ -145,6 +188,7 @@ export function ProfileAnimeCard({item,library,canEdit,onChange,onOpenDetail}:{i
       {total?<div className="at-library-progress" role="progressbar" aria-label={item.title+' izleme ilerlemesi'} aria-valuenow={count} aria-valuemin={0} aria-valuemax={total} aria-valuetext={`${count} / ${total} bölüm`}><span style={{width:`${count/total*100}%`}}/></div>:<div className="at-library-progress is-unknown" aria-hidden="true"><span/></div>}
     </div>
     {canEdit&&<button type="button" className="at-library-advance" onClick={advance} disabled={finished} aria-label={item.title+': '+actionLabel.toLocaleLowerCase('tr-TR')} title={actionLabel}>{complete?<Check size={20}/>:finished?<Minus size={20}/>:<Plus size={22}/>}</button>}
+    <ProfileLibraryEditor item={item} library={library} canEdit={canEdit} onChange={onChange}/>
   </article>;
 }
 
@@ -258,52 +302,158 @@ export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime;
       <section className="at-rating-block" aria-labelledby="at-rating-label"><div><h2 id="at-rating-label">Puanın</h2><div className="at-large-score"><strong>{score||'—'}</strong><span>/10</span></div></div><div className="at-rating-stars" aria-hidden="true">{Array.from({length:5},(_,index)=>score>=index*2+2?<Star key={index} size={21} fill='currentColor' className='is-filled'/>:score>=index*2+1?<StarHalf key={index} size={21} fill='currentColor' className='is-filled'/>:<Star key={index} size={21}/>)}</div><label className="at-score-edit"><span className="at-visually-hidden">Puanını seç</span><select disabled={!canEdit} value={score} onChange={event=>{const value=Number(event.target.value);onChange(current=>{const scores={...current.scores};if(value)scores[item.id]=value;else delete scores[item.id];return {...stored(current,item),scores};});}}><option value="0">Puan ver</option>{Array.from({length:10},(_,index)=>10-index).map(value=><option value={value} key={value}>{value} / 10</option>)}</select><ChevronDown size={13}/></label></section>
       <section className="at-detail-relations" aria-label="Bağlantılı seriler"><h2>Bağlantılı seriler</h2>{relations.length ? <div>{relations.map(relation=><a key={relation.id} href={malUrl(relation.url)!} target="_blank" rel="noopener noreferrer"><span>{relation.title}</span><ExternalLink size={13}/></a>)}</div> : <p>{details?'Bağlantılı seri bilgisi bulunmuyor.':detailError?'Ek bilgiler şu anda alınamıyor.':'Bağlantılı seriler yükleniyor…'}</p>}</section>
     </div>
-    <nav className="at-detail-jump" aria-label="Anime sayfası bölümleri"><button className="is-active" onClick={()=>document.getElementById("at-detail-overview")?.scrollIntoView({block:"start"})}>Genel bakış</button><button onClick={()=>document.getElementById("at-detail-tracking")?.scrollIntoView({block:"start"})}>Bölüm takibi</button><button onClick={()=>document.getElementById("at-reviews-title")?.scrollIntoView({block:"start"})}>Yorumlar</button></nav>
     <div className="at-detail-bottom">
       {!snapshot.account?.authenticated && <p className="at-signin-prompt">Listen bu tarayıcıda saklanır. Cihazların arasında eşitlemek ve yorum yazmak için <a href="/giris">giriş yap</a> veya <a href="/uye-ol">üye ol</a>.</p>}
       {snapshot.libraryLoading && <p className="at-muted" role="status">Hesap listen yükleniyor…</p>}
       {snapshot.blocked && <p className="at-muted">Hesabının düzenleme yetkisi şu anda kapalı.</p>}
-      <Reviews item={item} snapshot={snapshot}/>
+      <Reviews key={`${item.malId}:${snapshot.account?.user?.id || "guest"}`} item={item} snapshot={snapshot}/>
     </div>
   </article>;
 }
 
-function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
-  const [result, setResult] = useState<{reviews: Review[]; average: number | null; total: number} | null>(null);
+export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
+  const [result, setResult] = useState<ReviewPage | null>(null);
   const [error, setError] = useState('');
   const [version, reload] = useState(0);
   const [body, setBody] = useState('');
   const [spoiler, setSpoiler] = useState(false);
+  const [editing, setEditing] = useState<Review | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [notice, setNotice] = useState('');
   const [revealed, setRevealed] = useState<string[]>([]);
   const [hiding, setHiding] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [ownRemoved, setOwnRemoved] = useState(false);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const touched = useRef(false);
+  const generation = useRef(0);
+  const mutation = useRef<AbortController | null>(null);
+  const moreRequest = useRef<AbortController | null>(null);
+  const user = snapshot.account?.user;
+  const userId = user?.id;
+  const editable = userCanEdit(snapshot);
+  const busy = sending || hiding !== null;
+  const score = snapshot.library.scores?.[item.id] ?? editing?.score ?? null;
+  const changed = !editing || body.trim() !== editing.body || spoiler !== editing.spoiler || score !== editing.score;
+  const canSubmit = editable && !ownRemoved && !busy && !!item.malId && body.trim().length > 0 && changed;
+  const ownAvatar = avatarUrl(user?.avatarUrl);
+  const avatar = (name: string, own: boolean) => <span className="at-mini-avatar at-review-avatar" aria-hidden="true"><span>{initial(name)}</span>{own && ownAvatar && <img src={ownAvatar} alt="" onError={event => {event.currentTarget.hidden = true;}}/>}</span>;
+
+  // A new anime/account invalidates every pending mutation as well as its draft.
+  useEffect(() => {
+    generation.current++;
+    touched.current = false;
+    setBody(''); setSpoiler(false); setEditing(null); setSendError(''); setNotice('');
+    setSending(false); setHiding(null); setConfirming(null); setOwnRemoved(false); setRevealed([]);
+    return () => {
+      generation.current++;
+      mutation.current?.abort(); mutation.current = null;
+      moreRequest.current?.abort(); moreRequest.current = null;
+    };
+  }, [item.malId, userId]);
+
   useEffect(() => {
     const controller = new AbortController();
-    setResult(null); setError(''); setBody(''); setSpoiler(false); setSendError(''); setRevealed([]);
+    moreRequest.current?.abort(); moreRequest.current = null;
+    setResult(null); setError(''); setPage(1); setLoadingMore(false);
     if (!item.malId) { setError('Yorumlar için geçerli bir anime kimliği bulunamadı.'); return () => controller.abort(); }
-    api<{reviews: Review[]; average: number | null; total: number}>(`/api/anime/${item.malId}/reviews`, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setResult(value); }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Yorumlar alınamadı.'); });
+    api<ReviewPage>(`/api/anime/${item.malId}/reviews?page=1&limit=20`, {signal: controller.signal}).then(value => {
+      if (controller.signal.aborted) return;
+      setResult(value);
+      const own = value.reviews.find(review => review.userId === userId);
+      if (own) {
+        setEditing(own);
+        if (!touched.current) { setBody(own.body); setSpoiler(own.spoiler); }
+      }
+    }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Yorumlar alınamadı.'); });
     return () => controller.abort();
-  }, [item.malId, version]);
+  }, [item.malId, userId, version]);
+
   const submit = async (event: React.FormEvent) => {
-    event.preventDefault(); if (sending || !body.trim() || !userCanEdit(snapshot)) return;
-    setSending(true); setSendError('');
+    event.preventDefault();
+    if (!canSubmit || mutation.current) return;
+    const controller = new AbortController(), token = generation.current;
+    mutation.current = controller; setSending(true); setSendError(''); setNotice('');
     try {
-      await api(`/api/anime/${item.malId}/reviews`, { method: 'POST', body: JSON.stringify({ body: body.trim(), spoiler, score: snapshot.library.scores?.[item.id] || null }) });
-      setBody(''); setSpoiler(false); reload(value => value + 1);
-    } catch (reason) { setSendError(reason instanceof Error ? reason.message : 'Yorum gönderilemedi.'); }
-    finally { setSending(false); }
+      const value = await api<{review: Review}>(`/api/anime/${item.malId}/reviews`, {method: 'POST', signal: controller.signal, body: JSON.stringify({body: body.trim(), spoiler, score})});
+      if (generation.current !== token || controller.signal.aborted) return;
+      touched.current = false; setEditing(value.review); setBody(value.review.body); setSpoiler(value.review.spoiler);
+      setNotice('Yorumun kaydedildi.'); setRevealed([]); reload(value => value + 1);
+    } catch (reason) {
+      if (generation.current === token && !controller.signal.aborted) setSendError(reason instanceof Error ? reason.message : 'Yorum gönderilemedi.');
+    } finally {
+      if (generation.current === token && mutation.current === controller) { mutation.current = null; setSending(false); }
+    }
+  };
+
+  const beginEdit = (review: Review) => {
+    if (busy || !editable || review.userId !== userId) return;
+    touched.current = false; setEditing(review); setBody(review.body); setSpoiler(review.spoiler); setSendError(''); setNotice('');
+    textarea.current?.focus({preventScroll: true}); textarea.current?.scrollIntoView({block: 'center'});
+  };
+  const resetDraft = () => {
+    touched.current = false; setBody(editing?.body || ''); setSpoiler(editing?.spoiler || false); setSendError('');
   };
   const hide = async (review: Review) => {
-    setHiding(review.id); setSendError('');
+    if (mutation.current || !editable || (review.userId !== userId && user?.role !== 'admin')) return;
+    const controller = new AbortController(), token = generation.current;
+    mutation.current = controller; setHiding(review.id); setSendError(''); setNotice('');
     try {
-      await api(`/api/anime/${item.malId}/reviews/${encodeURIComponent(review.id)}`, { method: 'PATCH', body: JSON.stringify({hidden: true}) });
-      setResult(current => current ? {...current, reviews: current.reviews.filter(value => value.id !== review.id), total: Math.max(0, current.total - 1)} : null);
+      await api(`/api/anime/${item.malId}/reviews/${encodeURIComponent(review.id)}`, {method: 'PATCH', signal: controller.signal, body: JSON.stringify({hidden: true})});
+      if (generation.current !== token || controller.signal.aborted) return;
+      setConfirming(null); setNotice(review.userId === userId ? '' : 'Yorum yayından kaldırıldı.');
+      if (review.userId === userId) { setOwnRemoved(true); setEditing(null); setBody(''); setSpoiler(false); touched.current = false; }
       reload(value => value + 1);
-    } catch (reason) { setSendError(reason instanceof Error ? reason.message : 'Yorum kaldırılamadı.'); }
-    finally { setHiding(null); }
+    } catch (reason) {
+      if (generation.current === token && !controller.signal.aborted) setSendError(reason instanceof Error ? reason.message : 'Yorum kaldırılamadı.');
+    } finally {
+      if (generation.current === token && mutation.current === controller) { mutation.current = null; setHiding(null); }
+    }
   };
-  return <section className="at-reviews" aria-labelledby="at-reviews-title"><div className="at-section-line"><h3 id="at-reviews-title">İzleyenler ne diyor?</h3>{result && <span className="at-review-count">{result.total} yorum{result.average != null && <> · <Star size={13}/> {Number(result.average).toFixed(1)}</>}</span>}</div>{userCanEdit(snapshot) && <form className="at-review-form" onSubmit={submit}><label htmlFor="at-review-body">Senin yorumun</label><textarea id="at-review-body" value={body} maxLength={2000} minLength={1} required rows={3} placeholder="Bu hikâye sende ne bıraktı?" onChange={event => setBody(event.target.value)}/><div className="at-review-submit"><label className="at-check-label"><input type="checkbox" checked={spoiler} onChange={event => setSpoiler(event.target.checked)}/> Spoiler içeriyor</label><button className="at-primary-button" disabled={sending || body.trim().length < 1}>{sending ? 'Gönderiliyor…' : 'Yorumu paylaş'}<ArrowRight size={15}/></button></div></form>}{sendError && <p className="at-error" role="alert">{sendError}</p>}{error ? <p className="at-error" role="alert">{error} <button className="at-text-button" onClick={() => reload(value => value + 1)}>Tekrar dene</button></p> : !result ? <p className="at-muted" role="status">Yorumlar yükleniyor…</p> : result.reviews.length === 0 ? <p className="at-empty-note">Henüz yorum yok. İlk düşünceyi sen paylaş.</p> : <div className="at-review-list">{result.reviews.map(review => { const hidden = review.spoiler && !revealed.includes(review.id); return <article className="at-review" key={review.id}><div className="at-review-author"><span className="at-mini-avatar" aria-hidden="true">{initial(review.displayName)}</span><div><strong>{review.displayName}</strong><time dateTime={review.createdAt}>{dateLabel(review.createdAt)}</time></div>{review.score != null && <span className="at-user-score"><Star size={13}/>{review.score}/10</span>}{(snapshot.account?.user?.id === review.userId || snapshot.account?.user?.role === 'admin') && <button className="at-icon-button" aria-label="Bu yorumu kaldır" title="Yorumu kaldır" disabled={hiding === review.id} onClick={() => hide(review)}><Trash2 size={15}/></button>}</div>{hidden ? <button className="at-spoiler-button" onClick={() => setRevealed(current => [...current, review.id])}><Eye size={17}/> Spoiler içeren yorumu göster</button> : <p>{review.body}</p>}</article>; })}</div>}</section>;
+  const loadMore = async () => {
+    if (!result || moreRequest.current || busy) return;
+    const controller = new AbortController(), token = generation.current, nextPage = page + 1;
+    moreRequest.current = controller; setLoadingMore(true); setError('');
+    try {
+      const value = await api<ReviewPage>(`/api/anime/${item.malId}/reviews?page=${nextPage}&limit=20`, {signal: controller.signal});
+      if (generation.current !== token || controller.signal.aborted) return;
+      setResult(current => current ? {...value, reviews: [...current.reviews, ...value.reviews.filter(review => !current.reviews.some(existing => existing.id === review.id))]} : value);
+      setPage(nextPage);
+      const own = value.reviews.find(review => review.userId === userId);
+      if (own) { setEditing(own); if (!touched.current) {setBody(own.body);setSpoiler(own.spoiler);} }
+    } catch (reason) {
+      if (generation.current === token && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Diğer yorumlar alınamadı.');
+    } finally {
+      if (generation.current === token && moreRequest.current === controller) {moreRequest.current = null;setLoadingMore(false);}
+    }
+  };
+
+  return <section className="at-reviews" aria-labelledby="at-reviews-title">
+    <div className="at-section-line at-reviews-heading"><div><h3 id="at-reviews-title">İzleyenler ne diyor?</h3><p>Fikrini paylaş, başka bakış açılarını keşfet.</p></div>{result && <span className="at-review-count">{result.total} yorum{result.average != null && <><span aria-hidden="true">·</span><Star size={14}/><span>{Number(result.average).toFixed(1)}</span></>}</span>}</div>
+    {editable && !ownRemoved && <form className="at-review-form" onSubmit={submit} aria-busy={sending}>
+      <div className="at-review-composer-head">{avatar(user?.displayName || 'Sen', true)}<div><label htmlFor="at-review-body">{editing ? 'Yorumunu düzenle' : 'Senin yorumun'}</label><span>{user?.displayName}{score !== null && <> · <Star size={12}/>{score}/10</>}</span></div><span className="at-review-counter" id="at-review-counter">{body.length.toLocaleString('tr-TR')} / 2.000</span></div>
+      <textarea ref={textarea} id="at-review-body" aria-describedby="at-review-hint at-review-counter" value={body} maxLength={2000} minLength={1} required rows={4} disabled={busy} placeholder="Hikâye, karakterler veya atmosfer… Senin düşüncen ne?" onChange={event => {touched.current = true;setBody(event.target.value);setSendError('');setNotice('');}}/>
+      <p className="at-review-hint" id="at-review-hint">Her anime için bir yorum paylaşabilirsin; yeniden kaydettiğinde mevcut yorumun güncellenir.</p>
+      <div className="at-review-submit"><label className="at-review-spoiler-check"><input type="checkbox" checked={spoiler} disabled={busy} onChange={event => {touched.current = true;setSpoiler(event.target.checked);setNotice('');}}/><span><strong>Spoiler içeriyor</strong><small>Önemli olayları okumadan önce gizle.</small></span></label><div className="at-review-submit-actions">{editing && changed && <button className="at-text-button" type="button" disabled={busy} onClick={resetDraft}>Vazgeç</button>}<button type="submit" className="at-primary-button" disabled={!canSubmit}>{sending ? 'Kaydediliyor…' : editing ? 'Yorumu güncelle' : 'Yorumu paylaş'}{sending ? <span className="at-review-spinner" aria-hidden="true"/> : <ArrowRight size={16}/>}</button></div></div>
+    </form>}
+    {ownRemoved && <p className="at-review-feedback" role="status">Yorumun yayından kaldırıldı. Kaldırılan yorum yeniden yayımlanamaz.</p>}
+    {notice && <p className="at-review-feedback is-success" role="status"><Check size={16}/>{notice}</p>}
+    {sendError && <p className="at-error at-review-feedback" role="alert">{sendError}</p>}
+    {error && <p className="at-error at-review-feedback" role="alert">{error}<button type="button" className="at-text-button" onClick={() => reload(value => value + 1)}>Tekrar dene</button></p>}
+    {!result && !error ? <div className="at-review-loading" role="status"><span className="at-review-spinner" aria-hidden="true"/>Yorumlar yükleniyor…</div> : result?.reviews.length === 0 ? <div className="at-review-empty"><MessageCircle size={27}/><strong>İlk düşünceyi sen paylaş.</strong><p>Henüz yorum yok. Bu anime hakkında konuşmayı başlatabilirsin.</p></div> : result && <div className="at-review-list">{result.reviews.map(review => {
+      const own = review.userId === userId, hidden = review.spoiler && !revealed.includes(review.id);
+      return <article className="at-review" key={review.id}>
+        <header className="at-review-author">{avatar(review.displayName, own)}<div className="at-review-author-copy"><strong>{review.displayName}{own && <span className="at-review-self">Sen</span>}</strong><time dateTime={review.createdAt}>{dateLabel(review.createdAt)}</time></div><div className="at-review-actions">{review.score != null && <span className="at-user-score"><Star size={13}/>{review.score}/10</span>}{editable && own && <button type="button" className="at-icon-button" aria-label="Kendi yorumunu düzenle" title="Yorumunu düzenle" disabled={busy} onClick={() => beginEdit(review)}><Pencil size={16}/></button>}{editable && (own || user?.role === 'admin') && <button type="button" className="at-icon-button" aria-label="Bu yorumu kaldır" title="Yorumu kaldır" aria-expanded={confirming === review.id} disabled={busy} onClick={() => setConfirming(confirming === review.id ? null : review.id)}><Trash2 size={16}/></button>}</div></header>
+        {review.spoiler && <span className="at-review-spoiler-tag"><Shield size={12}/>Spoiler içeriyor</span>}
+        {hidden ? <button type="button" className="at-spoiler-button" onClick={() => setRevealed(current => [...current, review.id])}><Eye size={18}/><span><strong>Spoiler içeren yorum</strong><small>Okumak için dokun.</small></span></button> : <><p className="at-review-body">{review.body}</p>{review.spoiler && <button type="button" className="at-review-rehide" onClick={() => setRevealed(current => current.filter(id => id !== review.id))}><EyeOff size={14}/>Spoileri yeniden gizle</button>}</>}
+        {confirming === review.id && <div className="at-review-remove-confirm" role="group" aria-label="Yorumu kaldırmayı onayla"><p>Bu yorum yayından kaldırılacak. İşlemi bu ekrandan geri alamazsın.</p><div><button type="button" className="at-text-button" disabled={busy} onClick={() => setConfirming(null)}>Vazgeç</button><button type="button" className="at-review-remove-button" disabled={busy} onClick={() => void hide(review)}>{hiding === review.id ? 'Kaldırılıyor…' : 'Yorumu kaldır'}</button></div></div>}
+      </article>;
+    })}</div>}
+    {result && result.reviews.length < result.total && <div className="at-review-pagination"><span>{result.reviews.length} / {result.total} yorum</span><button type="button" className="at-outline-button" disabled={loadingMore || busy} onClick={() => void loadMore()}>{loadingMore ? 'Yükleniyor…' : 'Daha fazla yorum'}<ChevronDown size={16}/></button></div>}
+  </section>;
 }
 
 const emptyLibrary: Library = { saved: [], reminders: [], progress: {}, view: 'grid', savedAnime: {}, tracking: {}, scores: {}, favorites: [], collections: [] };
@@ -539,7 +689,7 @@ export function ProfileView({ snapshot, publicUserId, onClose, onChange, onOpenD
         <div className="at-section-line at-library-heading"><div className="at-library-heading-copy"><h2>{isOwner?'Anime listem':'Anime listesi'}</h2><span>{items.length} anime</span></div><div className="at-library-view-toggle" role="group" aria-label="Liste görünümü"><button type="button" aria-pressed={libraryView==='classic'} title="Eski afiş tasarımı" onClick={()=>chooseLibraryView('classic')}><LayoutGrid size={15}/><span>Klasik</span></button><button type="button" aria-pressed={libraryView==='cinema'} title="Yeni sinematik tasarım" onClick={()=>chooseLibraryView('cinema')}><Clapperboard size={15}/><span>Sinematik</span></button></div></div>
         <div className="at-profile-tabs" role="group" aria-label="İzleme listesi filtresi">{[['all','Tümü'],...states,['favorites','Favoriler']].map(([value,label])=><button type="button" key={value} className={tab===value?'is-active':''} onClick={()=>{setTab(value);setLibraryPage(1);}} aria-pressed={tab===value}>{label}{value==='favorites'&&<Heart size={12}/>}</button>)}</div>
         {selected.length?<>
-          {libraryView==='cinema'?<div className="at-library-cinema" id="at-library-page-items">{pageItems.map(item=><ProfileAnimeCard key={item.id} item={item} library={library} canEdit={editable} onChange={onChange} onOpenDetail={onOpenDetail}/>)}</div>:<div className="at-profile-anime-grid at-library-classic" id="at-library-page-items">{pageItems.map(item=><button type="button" className="at-profile-anime" key={item.id} onClick={()=>onOpenDetail(item)}><Poster item={item}/><span className="at-profile-anime-name">{item.title}</span><small>{library.progress[item.id]||0} / {item.episodes||'?'} bölüm{library.scores?.[item.id]?' · ★ '+library.scores[item.id]:''}</small></button>)}</div>}
+          {libraryView==='cinema'?<div className="at-library-cinema" id="at-library-page-items">{pageItems.map(item=><ProfileAnimeCard key={item.id} item={item} library={library} canEdit={editable} onChange={onChange} onOpenDetail={onOpenDetail}/>)}</div>:<div className="at-profile-anime-grid at-library-classic" id="at-library-page-items">{pageItems.map(item=><ProfileClassicAnimeCard key={item.id} item={item} library={library} canEdit={editable} onChange={onChange} onOpenDetail={onOpenDetail}/>)}</div>}
           <footer className="at-library-page-footer"><p role="status" aria-live="polite">{(currentPage-1)*pageSize+1}–{Math.min(currentPage*pageSize,selected.length)} / {selected.length} anime{pageCount>1&&<span> · Sayfa {currentPage} / {pageCount}</span>}</p>{pageCount>1&&<nav className="at-library-pagination" aria-label="Anime listesi sayfaları"><button type="button" aria-label="Önceki sayfa" aria-controls="at-library-page-items" disabled={currentPage===1} onClick={()=>chooseLibraryPage(currentPage-1)}><ArrowLeft size={15}/></button>{pageLinks.map(page=>typeof page==='number'?<button type="button" key={page} aria-label={`${page}. sayfa`} aria-current={page===currentPage?'page':undefined} aria-controls="at-library-page-items" onClick={()=>chooseLibraryPage(page)}>{page}</button>:<span key={page} aria-hidden="true">…</span>)}<button type="button" aria-label="Sonraki sayfa" aria-controls="at-library-page-items" disabled={currentPage===pageCount} onClick={()=>chooseLibraryPage(currentPage+1)}><ArrowRight size={15}/></button></nav>}</footer>
         </>:<div className="at-profile-empty"><Bookmark size={28}/><h3>Bu rafta henüz bir hikâye yok.</h3><p>{isOwner?'Keşfettiğin animeleri listene ekleyerek başlayabilirsin.':'Bu kategoride henüz anime bulunmuyor.'}</p>{isOwner&&<button type="button" className="at-text-button" onClick={onClose}>Animeleri keşfet <ArrowRight size={15}/></button>}</div>}
       </section>

@@ -426,3 +426,17 @@ html[data-theme=dark] :is(.at-watch-status-trigger,.at-watch-status-option)[data
 .at-catalog-genre-option.is-selected{background:color-mix(in srgb,var(--coral) 9%,var(--paper))}
 .at-catalog-genre-empty{padding:15px 12px;color:var(--muted);font:11px/1.6 var(--sans)}
 @media(max-width:640px){.at-catalog-filter-slot.is-sort{width:134px;flex-basis:134px}.at-catalog-filter-slot.is-genre{width:142px;flex-basis:142px}.catalog .at-catalog-filter-trigger{min-height:39px;padding:7px 8px;gap:6px;font-size:10px}.at-catalog-filter-trigger .at-watch-status-symbol{width:22px;height:22px;flex-basis:22px}}
+
+/* The library shares the profile's favorite and tracking editor. */
+.exp-watchlist { --at-ink:var(--ink); --at-paper:var(--paper); --at-muted:var(--muted); --at-line:var(--line); --at-coral:var(--coral); }
+.exp-library-grid > article { min-width:0; align-self:start; }
+.exp-library-summary { display:flex; flex-wrap:wrap; align-items:center; gap:7px 10px; margin:12px 0; color:var(--muted); }
+.exp-library-summary > span { padding:4px 7px; border:1px solid var(--line); border-radius:6px; color:var(--ink); font-size:10px; line-height:1.4; }
+.exp-library-summary > small { font-size:11px; font-variant-numeric:tabular-nums; }
+.exp-watchlist .at-library-edit-panel { grid-template-columns:minmax(0,1fr); padding:10px; }
+.exp-watchlist .exp-status-tabs > button { display:flex; align-items:center; gap:5px; white-space:nowrap; }
+@media(max-width:420px) {
+  .exp-watchlist .at-library-edit-panel { padding:8px; }
+  .exp-watchlist .at-library-edit-details > summary { gap:5px; padding:8px; font-size:11px; }
+  .exp-watchlist .at-library-edit-details > summary > svg:first-child { display:none; }
+}

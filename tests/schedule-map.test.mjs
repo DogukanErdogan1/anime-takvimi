@@ -125,3 +125,17 @@ test('upcoming keeps an event at the current minute and resolves ties determinis
   assert.equal(next.item.id,'a'); assert.equal(next.delta,0);
   assert.equal(schedule.upcoming([event('old-minute',0,'09:59')],now).delta,10079);
 });
+
+
+test('the current minute stays on the axis before the first afternoon broadcast',()=>{
+  const items=[event('afternoon',4,'18:00')];
+  for(const minute of [0,1,359,550,719,720,1439]) {
+    const model=schedule.layout(items,{currentMinute:minute});
+    assert.ok(model.start<=minute);
+    assert.ok(model.position(minute)>=0 && model.position(minute)<=model.axisWidth);
+    assert.ok(model.rows[4].events[0].left>=0);
+  }
+  for(const minute of [null,undefined,NaN,-1,1440,'10:00']) {
+    assert.equal(schedule.layout(items,{currentMinute:minute}).start,720);
+  }
+});
