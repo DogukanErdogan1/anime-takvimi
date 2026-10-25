@@ -69,6 +69,26 @@ html[data-palette] :is(.season-shelf,.exp-today,.banner-editor,.membership-dialo
   color: var(--ink);
   border-color: var(--line);
 }
+html[data-palette] .avatar-form {
+  background: var(--theme-surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+html[data-palette] .avatar-form input[type=file]::file-selector-button {
+  background: var(--theme-surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+html[data-palette] .dialog-close {
+  background: var(--theme-surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+html[data-palette] .dialog-close:hover {
+  background: var(--theme-hover);
+  color: var(--ink);
+}
 html[data-palette] :is(.season-notice,.empty-state,.season-preview-state,.membership-form input[readonly]) {
   background: color-mix(in srgb,var(--ink) 4%,var(--theme-surface));
   color: var(--muted);

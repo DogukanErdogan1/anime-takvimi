@@ -27,7 +27,7 @@ function json(value: unknown, status = 200, cookie?: string) {
   return Response.json(value, {status, headers: responseHeaders});
 }
 
-export async function runAuthMutation(request: Request, action: 'register' | 'login' | 'logout') {
+export async function runAuthMutation(request: Request, action: 'register' | 'login' | 'demo' | 'logout') {
   try {
     if (request.method !== 'POST') throw new MembershipError(405, 'method_not_allowed', 'Bu işlem desteklenmiyor.');
     const payload = await readJsonMutation(request, 4096);
@@ -42,7 +42,7 @@ export async function runAuthMutation(request: Request, action: 'register' | 'lo
     const previousToken = parseSessionCookie(request.headers.get('cookie'));
     const result = action === 'register'
       ? await service.register(payload)
-      : await service.login(payload);
+      : action === 'demo' ? await service.loginDemo() : await service.login(payload);
     // Signing in rotates any previous session on this browser.
     if (previousToken) await service.logout(previousToken);
     return json({authenticated: true, registered: true, user: result.user}, action === 'register' ? 201 : 200,

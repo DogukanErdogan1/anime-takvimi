@@ -712,7 +712,6 @@
       if (button.dataset.mapDay !== undefined) { const day=Number(button.dataset.mapDay); if (Number.isInteger(day) && day>=0 && day<7) { state.day=day; state.mapPastOpen=false; renderCatalog(); renderAside(); } return; }
       if (button.hasAttribute('data-map-past')) { state.mapPastOpen=!state.mapPastOpen; renderCatalog(); return; }
       if (button.dataset.mapWeek !== undefined) { state.weekOffset = Math.max(-4, Math.min(4, state.weekOffset + Number(button.dataset.mapWeek))); updateDates(); renderPage(); return; }
-      if (button.hasAttribute('data-map-today')) { state.weekOffset = 0; updateDates(); state.day = state.todayDay; state.mapFocusNow = true; state.mapPastOpen = false; renderPage(); return; }
       if (button.dataset.mapFilter) { state.mapSaved = button.dataset.mapFilter === 'saved'; renderCatalog(); renderAside(); return; }
       if (button.dataset.page) { changePage(button.dataset.page); return; }
       if (button.dataset.format) { state.format = button.dataset.format; state.limit = Infinity; renderPage(); return; }

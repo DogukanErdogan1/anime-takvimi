@@ -11,6 +11,7 @@ export function clearSessionCookie(requestUrl: string): string;
 export function createEmailAuthService(db: D1Database, options?: {now?: () => number}): {
   register(payload: unknown): Promise<AuthResult>;
   login(payload: unknown): Promise<AuthResult>;
+  loginDemo(): Promise<AuthResult>;
   resolveUser(sessionToken: string | null | undefined): Promise<AuthIdentity | null>;
   logout(sessionToken: string | null | undefined): Promise<{ok: true}>;
 };

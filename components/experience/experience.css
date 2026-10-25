@@ -150,6 +150,7 @@ body[data-experience=true] .site-masthead .nav-account{gap:16px}
 .exp-nav-search:focus-within{border-color:var(--coral);box-shadow:0 0 0 2px #f16f5b20}
 body[data-experience=true] .account-actions:has(.account-identity)>.account-link{display:none}
 body[data-experience=true] .account-identity{font-family:var(--serif);font-size:13px;max-width:155px;gap:9px;padding:0;background:transparent}
+body[data-experience=true] .account-name{display:block;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body[data-experience=true] .account-actions>button.account-identity::after{content:'⌄';font:16px var(--sans);color:#d2d8dc;margin-left:2px}
 body[data-experience=true] .account-avatar{width:34px;height:34px;border:1px solid #ffffff80;background:#314651}
 body[data-experience-page=detail][data-experience=true] :is(.page-header,#hero,#catalog-section,#season-library,#season-library-art){display:none!important}

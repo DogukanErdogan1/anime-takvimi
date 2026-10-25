@@ -10,7 +10,7 @@
     pending: null, version: 0, savedVersion: 0, saving: false, blocked: false,
     notice: 'Hesap bilgileri yükleniyor…', noticeKind: 'loading', retryAction: null,
     adminOpen: false, adminDenied: false, adminLoading: false, adminPage: 1, adminPages: 1,
-    adminQuery: '', members: [], stats: null, adminError: '', memberMutations: new Set(), avatarUploading: false
+    adminQuery: '', members: [], stats: null, adminError: '', memberMutations: new Set(), avatarUploading: false, demoLoggingIn: false
   };
   let debounceTimer;
   let searchTimer;
@@ -90,9 +90,9 @@
     const actions = $('#account-actions');
     if (actions) {
       if (state.accountLoading && !state.account) actions.innerHTML = '<span class="account-identity">Hesap yükleniyor…</span>';
-      else if (!state.account?.authenticated) actions.innerHTML = filePreview() ? '<button type="button" class="account-link" data-member-action="setup">Giriş yap</button><button type="button" class="account-link primary-button" data-member-action="setup">Üye ol</button>' : `<a class="account-link" href="${escape(signInUrl())}" target="_top">Giriş yap</a><a class="account-link primary-button" href="${escape(registerUrl())}" target="_top">Üye ol</a>`;
-      else if (!registered()) actions.innerHTML = `<span class="account-identity"><span class="avatar profile-avatar account-avatar" data-avatar-frame>${avatarMarkup()}</span>${escape(state.account.identity?.displayName || 'Hesabım')}</span><button type="button" class="primary-button" data-member-action="register">Üyeliği tamamla</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a>`;
-      else actions.innerHTML = `<button type="button" class="account-identity" data-member-action="profile"><span class="avatar profile-avatar account-avatar" data-avatar-frame>${avatarMarkup(state.account.user)}</span>${escape(state.account.user.displayName)}<span class="account-badge">${state.account.user.role === 'admin' ? 'Yönetici' : 'Üye'}</span></button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a>`;
+      else if (!state.account?.authenticated) actions.innerHTML = filePreview() ? '<button type="button" class="account-link" data-member-action="setup">Siteyi aç</button>' : `<a class="account-link" href="${escape(signInUrl())}" target="_top">Giriş yap</a><button type="button" class="account-link primary-button" data-member-action="demo-login"${state.demoLoggingIn ? ' disabled' : ''}>${state.demoLoggingIn ? 'Giriş yapılıyor…' : 'Demo hesaba giriş'}</button>`;
+      else if (!registered()) actions.innerHTML = `<span class="account-identity"><span class="avatar profile-avatar account-avatar" data-avatar-frame>${avatarMarkup()}</span><span class="account-name">${escape(state.account.identity?.displayName || 'Hesabım')}</span></span><button type="button" class="primary-button" data-member-action="register">Üyeliği tamamla</button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a>`;
+      else actions.innerHTML = `<button type="button" class="account-identity" data-member-action="profile"><span class="avatar profile-avatar account-avatar" data-avatar-frame>${avatarMarkup(state.account.user)}</span><span class="account-name">${escape(state.account.user.displayName)}</span><span class="account-badge">${state.account.user.role === 'admin' ? 'Yönetici' : 'Üye'}</span></button><a class="account-link" href="${escape(signOutUrl())}" target="_top">Çıkış</a>`;
     }
     const profile = $('#profile-button');
     if (profile) {
@@ -127,6 +127,17 @@
     state.blocked = true; renderAccount();
     setNotice(errorText(error), 'error', 'reload-account');
     return true;
+  }
+
+  async function loginDemo() {
+    if (state.demoLoggingIn) return;
+    state.demoLoggingIn = true; renderAccount();
+    try {
+      await api('/api/auth/demo', {method: 'POST', body: '{}'});
+      await loadAccount();
+    } catch (error) {
+      setNotice(errorText(error), 'error');
+    } finally { state.demoLoggingIn = false; renderAccount(); }
   }
 
   async function loadAccount() {
@@ -463,6 +474,7 @@
         case 'setup': openSetup(); break;
         case 'close-dialog': closeDialog(); break;
         case 'register': openRegistration(); break;
+        case 'demo-login': loginDemo(); break;
         case 'profile': openProfile(); break;
         case 'settings': openSettings(); break;
         case 'watchlist': closeDialog(); document.querySelector('#nav-items [data-page="watchlist"]')?.click(); break;

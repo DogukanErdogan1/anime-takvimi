@@ -200,6 +200,7 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
 
   const close = () => {setOpen(false); trigger.current?.focus();};
   return <>
+    {snapshot.account?.authenticated && <>
     <div className="experience-controls" aria-label="Hatırlatmalar">
       <button ref={trigger} type="button" className="experience-control experience-bell" onClick={() => setOpen(true)} aria-label={`Bildirimler${today.length ? `, bugün ${today.length} yayın` : ""}`} aria-haspopup="dialog" title="Bildirimler"><Bell size={19}/>{today.length > 0 && <span className="experience-notification-dot" aria-hidden="true"/>}</button>
     </div>
@@ -233,5 +234,6 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
         </section>
       </div>
     </dialog>
+    </>}
   </>;
 }

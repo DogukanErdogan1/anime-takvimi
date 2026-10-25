@@ -194,7 +194,7 @@ test('opening the calendar reveals today and the actual current time instead of 
   const ui=setup({}, {todayTop:850,width:600});
   ui.mount();
   assert.match(ui.target.innerHTML,/class="map-clock"[^>]*>Şimdi 17:15<\/time>/);
-  assert.match(ui.target.innerHTML,/data-map-today[^>]*>Şimdiye git<\/button>/);
+  assert.doesNotMatch(ui.target.innerHTML,/Şimdiye git|data-map-today/);
   assert.match(ui.target.innerHTML,/45 dk sonra/);
   const nowLeft=Number(ui.target.innerHTML.match(/class="map-now" style="left:([\d.]+)px"/)[1]);
   assert.ok(ui.scroller.scrollLeft>0);
