@@ -20,7 +20,7 @@ const source=readFileSync(new URL('../components/experience/detail-profile.tsx',
 const ast=ts.createSourceFile('detail-profile.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
 const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&['AnimePoster','imageUrl'].includes(node.name?.text)).map(node=>node.getText(ast));
 assert.equal(functions.length,2);
-const component=write('component',ts.transpileModule(`import {useState,useEffect} from './${path.basename(hooksFile)}';import {Bookmark} from 'lucide-react';${functions.join('\n')}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX}}).outputText);
+const component=write('component',ts.transpileModule(`import {useState,useEffect,useRef} from './${path.basename(hooksFile)}';import {Bookmark} from 'lucide-react';${functions.join('\n')}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX}}).outputText);
 const hooks=await import(pathToFileURL(hooksFile).href),{AnimePoster}=await import(pathToFileURL(component).href);
 after(()=>{for(const file of files)try{unlinkSync(file);}catch{}});
 const COVER='https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-example.jpg';
@@ -52,4 +52,12 @@ test('unsafe poster inputs and untrusted fallback responses never become image s
   environment(t,async()=> 'https://evil.example/poster.jpg');
   let tree=render({...item,image:'https://evil.example/primary.jpg'});hooks.flush();await settle();
   tree=render({...item,image:'https://evil.example/primary.jpg'});hooks.flush();assert.equal(tree.props.children.props.className,'at-poster-missing');
+});
+
+test('missing posters defer external fallback requests until near the viewport',async t=>{
+ const previous=globalThis.IntersectionObserver;let reveal;globalThis.IntersectionObserver=class {constructor(callback){reveal=callback;}observe(){}disconnect(){}};
+ t.after(()=>{if(previous===undefined)delete globalThis.IntersectionObserver;else globalThis.IntersectionObserver=previous;});
+ const calls=[];environment(t,async id=>{calls.push(id);return COVER;});
+ const anime={...item,image:null};let tree=render(anime);tree.props.ref.current={};hooks.flush();await settle();assert.deepEqual(calls,[]);
+ reveal([{isIntersecting:true}]);tree=render(anime);hooks.flush();await settle();tree=render(anime);assert.deepEqual(calls,[21]);assert.equal(tree.props.children.props.src,COVER);
 });

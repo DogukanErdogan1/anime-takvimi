@@ -50,6 +50,20 @@
       "when": 1792281600000,
       "tag": "0006_member_profile_frames",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794560400000,
+      "tag": "0007_reports_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794560400001,
+      "tag": "0008_push_sessions",
+      "breakpoints": true
     }
   ]
 }

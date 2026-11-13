@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "../components/experience/enhancements.css";
 import "../public/site/schedule-map.css";
 import "../public/site/season-library.css";
 import "../components/experience/experience.css";
@@ -11,6 +12,7 @@ import "../components/experience/catalog-contrast.css";
 import ThemePreference from '@/components/experience/theme-preference';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_PUBLIC_URL || 'https://anime-takvimi-production.up.railway.app'),
   title: "Anime Takvimi — Keşfet, takip et",
   description: "MyAnimeList sezon kataloğunu keşfet, kendi anime listeni oluştur ve hesabınla takip et.",
   manifest: '/manifest.webmanifest',

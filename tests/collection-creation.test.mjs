@@ -13,11 +13,14 @@ import {createMembershipService,validateLibrary} from '../lib/membership.mjs';
 const runtime=resolve('.sites-runtime');mkdirSync(runtime,{recursive:true});
 const files=[];
 function write(name,source){const file=resolve(runtime,`collection-form-${name}-${process.pid}.mjs`);files.push(file);writeFileSync(file,source);return file;}
-const hooksFile=write('hooks',`let values=[],cursor=0,profile=null;export function reset(value){values=[];profile=value;}export function begin(){cursor=0;}export function useState(initial){const index=cursor++;if(!(index in values))values[index]=index===0?profile:typeof initial==='function'?initial():initial;return[values[index],next=>{values[index]=typeof next==='function'?next(values[index]):next;}];}export function useEffect(){}export function useMemo(callback){return callback();}export function useRef(initial){const index=cursor++;if(!(index in values))values[index]={current:initial};return values[index];}`);
+const hooksFile=write('hooks',`let values=[],cursor=0,profile=null;export function reset(value){values=[];profile=value;}export function begin(){cursor=0;}export function useState(initial){const index=cursor++;if(!(index in values))values[index]=index===0?profile:typeof initial==='function'?initial():initial;return[values[index],next=>{values[index]=typeof next==='function'?next(values[index]):next;}];}export const useLayoutEffect=useEffect;export function useEffect(){}export function useMemo(callback){return callback();}export function useRef(initial){const index=cursor++;if(!(index in values))values[index]={current:initial};return values[index];}`);
 const options={target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX};
 const modelFile=write('model',ts.transpileModule(readFileSync(new URL('../components/experience/model.ts',import.meta.url),'utf8'),{compilerOptions:options}).outputText);
 const watchStatusFile=write('watch-status-select',ts.transpileModule(readFileSync(new URL('../components/experience/watch-status-select.tsx',import.meta.url),'utf8'),{compilerOptions:options}).outputText);
 const source=readFileSync(new URL('../components/experience/detail-profile.tsx',import.meta.url),'utf8')
+  .replace(/import \{ReportReview,ModerationPanel\} from '\.\/moderation';/, 'const ReportReview=()=>null,ModerationPanel=()=>null;')
+  .replace(/import ShareAnime from '\.\/share-anime';/, 'const ShareAnime=()=>null;')
+  .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')
   .replace(/import \{AvatarFrame\} from '\.\/avatar-frame';/, 'const AvatarFrame=()=>null;')
   .replace(/import AvatarFramePicker from '\.\/avatar-frame-picker';/, 'const AvatarFramePicker=()=>null;')
   .replace("from '../../lib/avatar-frames.mjs'", `from '${new URL('../lib/avatar-frames.mjs',import.meta.url).href}'`)

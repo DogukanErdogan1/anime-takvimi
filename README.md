@@ -64,7 +64,7 @@ Sinematik ana sayfa, izleme listesi, anime ayrıntıları, profil ve bildirim ko
 - Anime ayrıntılarındaki fragman ve bağlantılı seriler Tenrai `/anime/{id}/full` yanıtından gelir. Kaynakta bulunmayan bilgi gösterilmez.
 - Üyeler spoiler işaretli yorum yazabilir. Kendi yorumlarını veya gerçek yönetici diğer yorumları kaldırabilir. Yorum yazma sınırı uygulanır.
 - Profil varsayılan olarak özeldir. Kullanıcı isteyerek açarsa ad, biyografi, listeler ve istatistikler paylaşılabilir. E-posta ve hatırlatıcılar public profil yanıtına eklenmez.
-- Zil panelinden tarayıcı bildirimleri ayrıca açılabilir. Hatırlatmalar **site açıkken**, Türkiye saatine çevrilmiş haftalık plan üzerinden çalışır; site kapalıyken sunucudan push gönderilmez. Bildirim izni ve tercihi kullanıcı tarafından yönetilir.
+- Zil panelinden tarayıcı bildirimleri ayrıca açılabilir. Hatırlatmalar **site açıkken**, Türkiye saatine çevrilmiş haftalık plan üzerinden çalışır; site kapalıyken gönderim için ayrıca arka plan bildirimleri açılabilir. Bildirim izni ve tercihi kullanıcı tarafından yönetilir.
 - Açık/koyu tema cihazda hatırlanır. Destekleyen tarayıcılarda ana ekrana ekleme bulunur. Service worker hesap/API yanıtlarını önbelleğe almaz; çevrimdışıyken bağlantı durumunu gösterir.
 
 `0004_community.sql` profil ve yorum tablolarını, `0005_member_covers.sql` profil kapağı kayıtlarını ekler; güncellemeden sonra yerel veritabanına `npm run db:migrate` uygulanmalıdır.
@@ -84,3 +84,24 @@ npm run build
 Testler gerçek SQL migrationlarıyla üyelik, oturum, liste, yetki, profil fotoğrafı ve banner kurallarını; başlatıcı testleri de mevcut sunucuyu kullanma, yanıt vermeyen bağlantıdan kurtulma, gecikmeli başlangıç ve dolu port davranışlarını sınar. Localhost üzerinde gerçek Workers scrypt, kayıt/giriş/çıkış, çerez ve kişisel liste akışı ayrıca doğrulanmıştır.
 
 Kaynak pakete `.env`, `.dev.vars`, `.wrangler`, `node_modules`, yerel hesaplar veya parolalar eklenmemelidir. GitHub'a yalnız kaynak dosyalarını gönder.
+
+## Liste aktarımı ve moderasyon
+
+Listem ve kendi profilindeki liste aktarım bölümünden JSON yedeği ve CSV indirebilirsin. JSON yedeği hesabın kimliğini, e-postasını ve cihaz hatırlatmalarını içermez. JSON ve MyAnimeList XML dosyaları en fazla 1 MiB / 500 anime ile sınırlandırılır. İçe aktarma önce önizlenir, onayda mevcut listeyle birleştirilir. Aynı animenin mevcut ilerleme, puan ve durum bilgisi korunur. Harici bir MyAnimeList hesabına giriş yapılmaz.
+
+Anime ayrıntılarında Paylaş düğmesi, doğrudan açılabilen /anime/MAL_NUMARASI bağlantısını kopyalar. Bu sayfalar gerçek anime başlığı, açıklaması ve sosyal paylaşım görseliyle sunulur. Kaynak veriye ulaşılamazsa tekrar deneme ekranı gösterilir.
+
+Üyeler başkasının yorumunu spoiler, hakaret, spam veya diğer gerekçesiyle bildirebilir. Yönetici kendi profilindeki Yorum şikâyetleri bölümünden şikâyeti kapatabilir veya yorumu gizleyebilir. Bildirimi yapan kişinin kimliği genel yorum yanıtlarında paylaşılmaz. 0007 migration'ı güncellemeden sonra uygulanmalıdır.
+
+## Site kapalıyken bildirimler
+
+Bildirimler panelindeki **Site kapalıyken de hatırlat** düğmesi, tarayıcı izninden sonra yalnız o hesap ve cihaz için abonelik oluşturur. Sunucu güncel Tenrai yayın planını Türkiye saatine çevirir ve her dakika uygun hatırlatmaları kontrol eder. Anime adı ve saat standart Web Push şifrelemesiyle tarayıcının Google/FCM, Mozilla, Apple veya Microsoft servisine iletilir. Saatler haftalık plandır; kesin bölüm yayın garantisi değildir.
+
+Abonelik gerçek giriş oturumuna bağlıdır. Çıkış, oturumun 7 günlük süresinin dolması, hesabın askıya alınması veya cihazdaki arka plan seçeneğinin kapatılması gönderimi durdurur. Tarayıcı, bekleyen bildirimi göstermeden önce mevcut oturumu, cihaz bağını ve ilgili anime hatırlatmasını yeniden kontrol eder. Geçersiz/sona ermiş push adresleri temizlenir; aynı yayın yalnız bir kez gönderilir. Geçici hatalar beş dakikalık pencerede en fazla üç kez denenir.
+
+Railway başlangıç komutu gönderim görevini otomatik başlatır. VAPID anahtarları Railway volume içindeki push-keys.json dosyasında bir kez üretilir; bu dosya kalıcı kalmalıdır. Her deploy'da anahtar yenilenmez. Kendi anahtarlarını kullanmak istersen PUSH_PUBLIC_KEY ve PUSH_PRIVATE_KEY'i birlikte gizli sunucu değişkenlerine ekle. PUSH_SUBJECT isteğe bağlı bir genel HTTPS adresidir; varsayılan site adresi kullanılır. Özel anahtarları Git'e gönderme.
+
+Yerelde npm run dev / Siteyi-Ac.cmd aynı görevi başlatır. Anahtarlar Git dışında .sites-runtime/local-push-keys.json içinde tutulur. Yerel D1 klasöründe birden fazla veritabanı varsa doğru dosyanın mutlak yolunu PUSH_LOCAL_DB ile belirt; görev belirsiz bir veritabanına bağlanmaz. 0008_push_sessions.sql migration'ını yerelde uyguladıktan sonra geliştirme sunucusunu yeniden başlat.
+
+Bildirim alabilmek için HTTPS (yerelde localhost), desteklenen tarayıcı, cihazda internet bağlantısı ve geçerli oturum gerekir. iPhone/iPad'de siteyi ana ekrana ekleyerek kullan. Tarayıcı tamamen kapatıldığında veya işletim sistemi arka plan çalışmasını engellediğinde teslimat gecikebilir. Bu özellik e-posta göndermez.
+

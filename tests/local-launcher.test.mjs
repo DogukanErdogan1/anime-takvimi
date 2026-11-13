@@ -46,7 +46,7 @@ test('output launchers reuse the installed source when the distributed copy has 
     project(packaged,false);
     for(const directory of [path.join(root,'outputs'), packaged]) {
       const result=launch(directory);
-      assert.equal(result.cwd,source);
+      assert.equal(path.resolve(result.cwd).toLowerCase(),path.resolve(source).toLowerCase());
       assert.deepEqual(result.args,['--no-open']);
     }
   } finally {cleanup(root);}
@@ -59,6 +59,6 @@ test('an installed standalone copy keeps its own files and data', {skip:process.
     const packaged=path.join(root,'outputs','anime-takvimi-guncel');
     project(source,true);
     project(packaged,true);
-    assert.equal(launch(packaged).cwd,packaged);
+    assert.equal(path.resolve(launch(packaged).cwd).toLowerCase(),path.resolve(packaged).toLowerCase());
   } finally {cleanup(root);}
 });

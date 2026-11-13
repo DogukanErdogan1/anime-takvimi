@@ -609,6 +609,7 @@
   }
 
   function changePage(page) {
+    if(location.pathname?.startsWith('/anime/')){location.assign('/#'+page);return;}
     if (!['discover', 'seasons', 'schedule', 'watchlist'].includes(page)) return;
     window.dispatchEvent(new CustomEvent('anime:navigate',{detail:{page}}));
     state.page = page; state.query = ''; state.genre = 'all'; state.limit = 5;

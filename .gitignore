@@ -57,3 +57,10 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Local verification output
+/audit-*.log
+/lint-*.json
+
+# Local standalone data and persistent sender keys
+/.anime-data/

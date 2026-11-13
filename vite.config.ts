@@ -1,9 +1,10 @@
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, type ViteDevServer } from "vite";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 import { fileURLToPath } from "node:url";
+import {loadPushKeys} from './lib/push-keys.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -32,6 +33,9 @@ const localBindingConfig = {
 
 export default defineConfig(async ({ command }) => {
   const railwayBuild = process.env.ANIME_RAILWAY_BUILD === "1";
+  // Development secrets are worker bindings only, never Vite client defines or
+  // build-time vars. Production Railway reads its own persistent volume keys.
+  const pushKeys = command === 'serve' ? loadPushKeys(fileURLToPath(new URL('./.sites-runtime/local-push-keys.json', import.meta.url))) : null;
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -74,6 +78,15 @@ export default defineConfig(async ({ command }) => {
         : {}),
     },
     plugins: [
+      ...(command === 'serve' ? [{
+        name: 'anime-background-reminders',
+        async configureServer(server: ViteDevServer) {
+          const {startLocalPushScheduler} = await import('./scripts/push-local.mjs');
+          const stop = startLocalPushScheduler();
+          server.httpServer?.once('close', stop);
+          server.watcher.once('close', stop);
+        },
+      }] : []),
       vinext(),
       sites({ mockAuth: false }),
       ...(!railwayBuild ? [connectorPreview()] : []),
@@ -82,6 +95,7 @@ export default defineConfig(async ({ command }) => {
         inspectorPort: false,
         config: {
           ...localBindingConfig,
+          ...(pushKeys ? {vars: {PUSH_PUBLIC_KEY: pushKeys.publicKey, PUSH_PRIVATE_KEY: pushKeys.privateKey, PUSH_SUBJECT: pushKeys.subject}} : {}),
           ...(command === "serve"
             ? {
                 services: [
@@ -111,4 +125,3 @@ export default defineConfig(async ({ command }) => {
     ],
   };
 });
-

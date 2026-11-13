@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useId, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useId, useRef, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import {Dialog} from 'radix-ui';
 import {Check, ScanFace, X} from 'lucide-react';
@@ -43,12 +43,14 @@ export default function AvatarFramePicker({frameId, userId, accountScope, displa
   const descriptionId = useId();
   const scope = userId + ':' + accountScope;
   const request = useRef({scope, alive: true, sequence: 0, controller: null as AbortController | null});
+  useLayoutEffect(() => {
   if (request.current.scope !== scope) {
     request.current.alive = false;
     request.current.sequence++;
     request.current.controller?.abort();
     request.current = {scope, alive: true, sequence: request.current.sequence, controller: null};
   }
+  }, [scope]);
   useEffect(() => {
     const lifecycle = request.current;
     lifecycle.alive = true;

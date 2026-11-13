@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { migrateRailwayDatabase } from "../lib/railway-runtime.mjs";
+import { migrateRailwayDatabase, railwayWorkersEnv, railwayPushConfig } from "../lib/railway-runtime.mjs";
+import {startPushScheduler} from '../lib/push-scheduler.mjs';
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const { databasePath, dataDirectory } = migrateRailwayDatabase();
@@ -13,20 +14,23 @@ const child = spawn(process.execPath, [serverPath], {
   stdio: "inherit",
 });
 
+const pushScheduler = startPushScheduler(railwayWorkersEnv.DB, railwayPushConfig());
 let shuttingDown = false;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    pushScheduler.stop();
     child.kill(signal);
   });
 }
 
 child.on("error", error => {
+  pushScheduler.stop();
   console.error("Could not start the Railway web server.", error);
   process.exitCode = 1;
 });
 child.on("exit", (code, signal) => {
+  pushScheduler.stop();
   process.exitCode = code ?? (signal ? 1 : 0);
 });
-

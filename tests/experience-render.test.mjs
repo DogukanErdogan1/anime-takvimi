@@ -17,6 +17,9 @@ for(const dependency of ['model','reminder-logic'])compile(dependency,readFileSy
 compile('watch-status-select',readFileSync(new URL('../components/experience/watch-status-select.tsx',import.meta.url),'utf8'));
 compile('catalog-filters',readFileSync(new URL('../components/experience/catalog-filters.tsx',import.meta.url),'utf8'));
 const profileSource=readFileSync(new URL('../components/experience/detail-profile.tsx',import.meta.url),'utf8')
+  .replace(/import \{ReportReview,ModerationPanel\} from '\.\/moderation';/, 'const ReportReview=()=>null,ModerationPanel=()=>null;')
+  .replace(/import ShareAnime from '\.\/share-anime';/, 'const ShareAnime=()=>null;')
+  .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')
   .replace(/import \{AvatarFrame\} from '\.\/avatar-frame';/,'const AvatarFrame=()=>null;')
   .replace(/import AvatarFramePicker from '\.\/avatar-frame-picker';/,'const AvatarFramePicker=()=>null;')
   .replace("from '../../lib/avatar-frames.mjs'",`from '${new URL('../lib/avatar-frames.mjs',import.meta.url).href}'`)
@@ -25,6 +28,7 @@ const profileSource=readFileSync(new URL('../components/experience/detail-profil
 compile('detail-profile',profileSource);
 const experienceSource=readFileSync(new URL('../components/experience/experience.tsx',import.meta.url),'utf8');
 const source=experienceSource
+  .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')
   .replace("from './detail-profile'",`from './experience-render-detail-profile-${process.pid}.mjs'`)
   .replace(/import \{ExperienceControls\} from '\.\/notifications';/,'const ExperienceControls=()=>null;')
   .replace(/import ThemePicker from '\.\/theme-picker';/,'const ThemePicker=()=>null;')

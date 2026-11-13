@@ -1,7 +1,8 @@
 "use client";
 
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useCallback, useMemo, useRef, useState} from "react";
 import {Bell, BellOff, BellRing, Check, Download, X} from "lucide-react";
+import BackgroundPush from "./background-push";
 import type {ExperienceSnapshot, LibraryChange} from "./types";
 import {broadcastMinute, dueReminders, notificationStorageKey, pruneDeliveryKeys, todayFollowed, turkeyClock} from "./reminder-logic";
 import "./notifications.css";
@@ -26,10 +27,19 @@ function readPreference(scope: string) {
 
 export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSnapshot; onChange: LibraryChange}) {
   const scope = snapshot.accountScope || "guest";
-  const scopeRef = useRef(scope); scopeRef.current = scope;
+  const [background,setBackground]=useState<{scope:string;active:boolean}>({scope:"",active:false});
+  const backgroundChanged=useCallback((active:boolean)=>setBackground({scope,active}),[scope]);
+  const backgroundPending=!!snapshot.account?.authenticated&&background.scope!==scope;
+  const backgroundActive=background.scope===scope&&background.active;
+  const scopeRef = useRef(scope);
   const accountEpoch = useRef({scope, value: 0});
-  if (accountEpoch.current.scope !== scope) accountEpoch.current = {scope, value: accountEpoch.current.value + 1};
-  const latest = useRef(snapshot); latest.current = snapshot;
+
+  const latest = useRef(snapshot);
+  useLayoutEffect(() => {
+    scopeRef.current = scope;
+    if (accountEpoch.current.scope !== scope) accountEpoch.current = {scope, value: accountEpoch.current.value + 1};
+    latest.current = snapshot;
+  }, [scope, snapshot]);
   const sent = useRef<string[]>([]);
   const busy = useRef(false);
   const permissionPending = useRef(false);
@@ -121,7 +131,7 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
   }, [open]);
 
   useEffect(() => {
-    if (!enabled || permission !== "granted" || !snapshot.ready || snapshot.libraryLoading || snapshot.blocked) return;
+    if (backgroundPending || backgroundActive || !enabled || permission !== "granted" || !snapshot.ready || snapshot.libraryLoading || snapshot.blocked) return;
     let disposed = false;
     const deliver = async () => {
       if (disposed || scopeRef.current !== scope || currentPermission() !== "granted") return;
@@ -168,7 +178,7 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
     void check();
     const timer = window.setInterval(() => {void check();}, 30_000);
     return () => {disposed = true; window.clearInterval(timer);};
-  }, [enabled, permission, scope, snapshot.ready, snapshot.libraryLoading, snapshot.blocked, items, snapshot.library.reminders]);
+  }, [backgroundPending, backgroundActive, enabled, permission, scope, snapshot.ready, snapshot.libraryLoading, snapshot.blocked, items, snapshot.library.reminders]);
 
   async function enableNotifications() {
     const requestedScope = scope, requestedEpoch = accountEpoch.current.value;
@@ -222,12 +232,13 @@ export function ExperienceControls({snapshot, onChange}: {snapshot: ExperienceSn
             </article>;
           }) : <div className="experience-reminder-empty"><Bell size={29}/><h3>Bugün sakin bir gün.</h3><p>Listene eklediğin, yayın saati açıklanmış animeler burada görünür.</p><button type="button" onClick={() => {close(); window.animeTakvimi?.navigate("schedule");}}>Yayın takvimine göz at</button></div>}
         </div>
-        <section className="experience-notification-optin" aria-labelledby="experience-notification-heading"><span className="experience-optin-icon">{enabled && permission === "granted" ? <BellRing size={21}/> : <BellOff size={21}/>}</span><div><h3 id="experience-notification-heading">Yayın zamanı haberin olsun</h3><p>Hatırlatmalar site açıkken çalışır. İşaretlediğin animenin planlanan yayın saatinde cihaz bildirimi gösterilir.</p></div>
+        <BackgroundPush key={scope} scope={scope} onActive={backgroundChanged}/>
+        <section className="experience-notification-optin" aria-labelledby="experience-notification-heading"><span className="experience-optin-icon">{enabled && permission === "granted" ? <BellRing size={21}/> : <BellOff size={21}/>}</span><div><h3 id="experience-notification-heading">Yayın zamanı haberin olsun</h3><p>Bu seçenek site açıkken hatırlatır. Arka plan bildirimi açıksa aynı yayın için ikinci kez bildirim gösterilmez.</p></div>
           <button type="button" className="experience-optin-button" onClick={() => {void enableNotifications();}} disabled={requesting || permission === "unsupported" || (permission === "denied" && !enabled)}>{requesting ? "İzin bekleniyor…" : enabled ? "Hatırlatmaları kapat" : "Bildirimleri aç"}</button>
           {permission === "unsupported" && <p className="experience-notification-help">Bu tarayıcı cihaz bildirimlerini desteklemiyor. Yayınlarını bu panelden takip edebilirsin.</p>}
           {permission === "denied" && <p className="experience-notification-help">Bildirim izni kapalı. Açmak için tarayıcının bu siteye ait izin ayarlarını kullan.</p>}
           {feedback && <p className="experience-notification-help" role="status">{feedback}</p>}
-          <small className="experience-notification-footnote">Saatler haftalık yayın planıdır; sonradan değişebilir. Site kapalıyken bildirim gönderilmez.</small>
+          <small className="experience-notification-footnote">Saatler haftalık yayın planıdır; sonradan değişebilir. Arka plan seçeneği açık olduğunda site kapalıyken de bildirim alabilirsin.</small>
         </section>
         <section className="experience-install"><span className="experience-install-icon">{installed ? <Check size={20}/> : <Download size={20}/>}</span><div><h3>{installed ? "Anime Takvimi hep yanında" : "Her zaman yanında."}</h3><p>{installed ? "Uygulama bu cihazda kullanıma hazır." : "Anime Takvimi’ni ana ekranına ekle."}</p></div>{!installed && <button type="button" onClick={() => {void install();}} aria-expanded={installHelp}>{promptReady ? "Uygulamayı ekle" : "Nasıl eklerim?"}</button>}
           {installHelp && <p className="experience-install-help">Telefonda tarayıcının <strong>Paylaş</strong> veya <strong>⋮</strong> menüsünden <strong>Ana ekrana ekle</strong> seçeneğini kullan. Bilgisayarda adres çubuğundaki yükleme simgesine veya tarayıcı menüsündeki uygulama yükleme seçeneğine bak. Seçenek görünmüyorsa siteyi yer imlerine ekleyebilirsin.</p>}

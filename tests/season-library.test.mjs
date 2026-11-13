@@ -307,13 +307,10 @@ test('returning to a hidden calendar resyncs the Istanbul date and week after mi
   assert.equal(ui.scheduleRequests.length,2);
 });
 
-test('the now button and reopening the calendar request the actual current week and time',async()=>{
+test('reopening the calendar restores the actual current week and time without a now button',async()=>{
   const ui=setup({hash:'#schedule'});await flush();
   ui.click({mapWeek:'1'});
   assert.equal(ui.mapSnapshots.at(-1).weekOffset,1);
-  ui.click({},['data-map-today']);
-  assert.equal(ui.mapSnapshots.at(-1).weekOffset,0);
-  assert.equal(ui.mapSnapshots.at(-1).focusNow,true);
   ui.click({page:'discover'});await flush();
   ui.advanceTo('2026-10-19T07:00:00Z',{tick:false});
   ui.click({page:'schedule'});

@@ -17,6 +17,9 @@ const compilerOptions = {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.E
 writeFileSync(modelCompiled, ts.transpileModule(readFileSync(new URL('../components/experience/model.ts',import.meta.url),'utf8'), {compilerOptions}).outputText);
 writeFileSync(watchStatusCompiled, ts.transpileModule(readFileSync(new URL('../components/experience/watch-status-select.tsx',import.meta.url),'utf8'), {compilerOptions}).outputText);
 const profileSource=source
+  .replace(/import \{ReportReview,ModerationPanel\} from '\.\/moderation';/, 'const ReportReview=()=>null,ModerationPanel=()=>null;')
+  .replace(/import ShareAnime from '\.\/share-anime';/, 'const ShareAnime=()=>null;')
+  .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')
   .replace(/import \{AvatarFrame\} from '\.\/avatar-frame';/, 'const AvatarFrame=()=>null;')
   .replace(/import AvatarFramePicker from '\.\/avatar-frame-picker';/, 'const AvatarFramePicker=()=>null;')
   .replace("from '../../lib/avatar-frames.mjs'", `from '${new URL('../lib/avatar-frames.mjs',import.meta.url).href}'`)

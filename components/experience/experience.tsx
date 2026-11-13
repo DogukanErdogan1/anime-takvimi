@@ -1,10 +1,12 @@
 'use client';
 
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight,Bell,Bookmark,Check,ChevronRight,Compass,Heart,Plus,Search,Star,X} from 'lucide-react';
 import {AnimeDetail,ProfileView,ProfileLibraryEditor,AnimePoster} from './detail-profile';
 import {ExperienceControls} from './notifications';
+import LibraryTransfer from './library-transfer';
+import './enhancements.css';
 import CatalogFilters from './catalog-filters';
 import ThemePicker from './theme-picker';
 import AccountAvatarFrames from './account-avatar-frames';
@@ -23,20 +25,29 @@ function readSnapshot():ExperienceSnapshot {
   const member=window.AnimeMembership?.getStatus?.();
   return {...data,ready:true,library:{...emptyLibrary,...data.library},account,loading:!!data.loading,error:data.error?'Anime verileri şu anda alınamıyor. Yeniden deneyebilirsin.':null,libraryLoading:!!member?.libraryLoading,blocked:!!member?.blocked||account?.user?.status==='suspended'};
 }
-function Poster({item,className=''}:{item:Anime;className?:string}) {
-  return <AnimePoster item={item} className={`exp-poster ${className}`} showTitle/>;
+function Poster({item,className='',priority=false}:{item:Anime;className?:string;priority?:boolean}) {
+  return <AnimePoster item={item} className={`exp-poster ${className}`} showTitle priority={priority}/>;
 }
 function useBanner(item:Anime|undefined){
-  const [banner,setBanner]=useState<string|null>(null);
-  useEffect(()=>{let alive=true,generation=0;const load=()=>{const token=++generation;setBanner(null);if(item)window.AnimeBanners?.resolve(item.malId).then(value=>{if(alive&&token===generation)setBanner(window.AnimeBanners?.safeBanner(value,item.malId)||null);});};const changed=(event:Event)=>{if((event as CustomEvent).detail?.malId===item?.malId)load();};load();window.addEventListener('anime:bannerchange',changed);return()=>{alive=false;window.removeEventListener('anime:bannerchange',changed);};},[item?.malId]);
-  return banner;
+  const malId=item?.malId;
+  const [resolved,setResolved]=useState<{malId:number|undefined;url:string|null}>({malId:undefined,url:null});
+  useEffect(()=>{let alive=true,generation=0;
+    const load=()=>{const token=++generation;if(malId)window.AnimeBanners?.resolve(malId).then(value=>{if(alive&&token===generation)setResolved({malId,url:window.AnimeBanners?.safeBanner(value,malId)||null});}).catch(()=>{});};
+    const changed=(event:Event)=>{if((event as CustomEvent).detail?.malId===malId)load();};load();window.addEventListener('anime:bannerchange',changed);return()=>{alive=false;window.removeEventListener('anime:bannerchange',changed);};
+  },[malId]);
+  return resolved.malId===malId?resolved.url:null;
 }
 export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
   const [offset,setOffset]=useState(0);
   const saved=snapshot.library.saved.map(id=>snapshot.library.savedAnime[id]).filter(Boolean);
   const continuing=saved.filter(item=>watchStatus(item,snapshot.library)==='watching');
-  const hero=continuing[0]||snapshot.catalog.find(item=>item.image)||saved[0];
+  const candidate=snapshot.catalog.find(item=>item.image)||saved[0];
+  const [featured,setFeatured]=useState<Anime|undefined>(undefined);
+  useEffect(()=>{if(!snapshot.loading&&candidate)setFeatured(current=>current||candidate);},[snapshot.loading,candidate]);
+  const hero=continuing[0]||featured||(!snapshot.loading?candidate:undefined);
   const banner=useBanner(hero);
+  const [loadedBanner,setLoadedBanner]=useState<string|null>(null);
+  const bannerReady=Boolean(banner&&loadedBanner===banner);
   const count=hero?snapshot.library.progress[hero.id]||0:0;
   const suggestions=recommendations(snapshot.catalog,snapshot.library,12);
   const start=offset<suggestions.length?offset:0;
@@ -45,14 +56,15 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
   const name=snapshot.account?.user?.displayName;
   useEffect(()=>{if(saved.length||snapshot.library.reminders.length)window.animeTakvimi?.loadSchedule();},[snapshot.accountScope,saved.length,snapshot.library.reminders.length]);
   return <section className="exp-home" aria-label="Sana özel anime dünyası">
-    <div className={'exp-cinema'+(banner?' has-banner':'')}>
-      {(banner||hero?.image)&&<img className="exp-cinema-art" src={banner||hero!.image!} alt="" referrerPolicy="no-referrer" decoding="async" onError={event=>{event.currentTarget.hidden=true;}}/>}
+    <div className={'exp-cinema'+(bannerReady?' has-banner':'')}>
+      {hero?.image&&<img className="exp-cinema-art exp-cinema-poster" src={hero.image} alt="" referrerPolicy="no-referrer" decoding="async"/>}
+      {banner&&<img key={banner} className={'exp-cinema-art exp-cinema-banner'+(bannerReady?' is-loaded':'')} src={banner} alt="" referrerPolicy="no-referrer" decoding="async" fetchPriority="high" onLoad={()=>setLoadedBanner(banner)} onError={event=>{event.currentTarget.hidden=true;}}/>}
       <div className="exp-cinema-shade"/>
       <div className="exp-hero-copy">
         <p className="exp-welcome">{name?'Hoş geldin, '+name+'.':'Yeni hikâyeler seni bekliyor.'}</p>
         <h1>Senin anime dünyan<span>.</span></h1>
         {hero?<div className="exp-hero-anime">
-          <button className="exp-hero-cover" onClick={()=>onDetail(hero)} aria-label={hero.title+' detayları'}><Poster item={hero}/></button>
+          <button className="exp-hero-cover" onClick={()=>onDetail(hero)} aria-label={hero.title+' detayları'}><Poster item={hero} priority/></button>
           <div className="exp-hero-meta"><small>{continuing.length?'KALDIĞIN YERDEN DEVAM ET':'SEZONDAN BİR HİKÂYE'}</small><h2>{hero.title}</h2><p>{continuing.length?count+(hero.episodes?' / '+hero.episodes:'')+' bölüm':hero.format+' · '+hero.studio}</p>{continuing.length>0&&<div className="exp-progress"><span style={{width:(hero.episodes?Math.min(100,count/hero.episodes*100):0)+'%'}}/></div>}</div>
           <div className="exp-hero-actions">
             <button className="exp-primary" disabled={snapshot.blocked||snapshot.libraryLoading} onClick={()=>continuing.length?onChange(current=>advanceEpisode(hero,current)):snapshot.library.saved.includes(hero.id)?window.animeTakvimi?.navigate('watchlist'):onChange(current=>({saved:[...new Set([...current.saved,hero.id])],savedAnime:{...current.savedAnime,[hero.id]:hero},tracking:{...current.tracking,[hero.id]:current.tracking[hero.id]||'planned'}}))}>{continuing.length?<Plus size={15}/>:snapshot.library.saved.includes(hero.id)?<Check size={15}/>:<Bookmark size={15}/>} {continuing.length?'Bölüm':snapshot.library.saved.includes(hero.id)?'Listemde':'Listeme ekle'}</button>
@@ -82,7 +94,7 @@ export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnaps
   const editable=snapshot.ready&&!snapshot.blocked&&!snapshot.libraryLoading&&snapshot.account?.user?.status!=='suspended';
   return <section className="exp-watchlist">
     <header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header>
-    <div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele">
+    <LibraryTransfer key={snapshot.accountScope||'guest'} library={library} onChange={onChange} disabled={!editable}/><div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele">
       <button type="button" className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{saved.length}</span></button>
       {statuses.map(status=><button type="button" key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}
       <button type="button" className={tab==='favorites'?'active':''} aria-pressed={tab==='favorites'} onClick={()=>setTab('favorites')}><Heart size={13} aria-hidden="true"/> Favoriler <span>{favorites.length}</span></button>
@@ -167,7 +179,7 @@ function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapsh
 function useNavigationEffects(page:string,ready:boolean){
   const currentPage=useRef(page);
   const refresh=useRef<(()=>void)|null>(null);
-  currentPage.current=page;
+  useLayoutEffect(()=>{currentPage.current=page;},[page]);
   useEffect(()=>{
     if(!ready)return;
     const rail=document.querySelector<HTMLElement>('.site-masthead .rail');
@@ -242,11 +254,11 @@ function useNavigationEffects(page:string,ready:boolean){
   },[ready]);
   useEffect(()=>{refresh.current?.();},[page,ready]);
 }
-export default function AnimeExperience(){
+export default function AnimeExperience({initialAnime}:{initialAnime?:Anime}={}){
   const [snapshot,setSnapshot]=useState(initial);
   const [hash,setHash]=useState('');
   const [slots,setSlots]=useState<{home:HTMLElement;page:HTMLElement;nav:HTMLElement;menu:HTMLElement}|null>(null);
-  const [detail,setDetail]=useState<Anime|null>(null);
+  const [detail,setDetail]=useState<Anime|null>(initialAnime||null);
   const [notice,setNotice]=useState('');
   const previousFocus=useRef<HTMLElement|null>(null);
   const previousScroll=useRef(0);
@@ -269,7 +281,8 @@ export default function AnimeExperience(){
   const page=admin?'admin':detail?'detail':profile?'profile':snapshot.page;
   useEffect(()=>{document.body.dataset.experiencePage=page;if(snapshot.ready)document.body.dataset.experience='true';},[page,snapshot.ready]);
   useNavigationEffects(page,snapshot.ready);
-  useEffect(()=>{setDetail(null);},[hash,snapshot.accountScope]);
+  useEffect(()=>{const dismiss=()=>setDetail(null);window.addEventListener('hashchange',dismiss);return()=>window.removeEventListener('hashchange',dismiss);},[]);
+  const closeDetail=()=>{if(initialAnime){window.location.assign('/#discover');return;}setDetail(null);requestAnimationFrame(()=>{window.scrollTo({top:previousScroll.current});if(previousFocus.current?.isConnected)previousFocus.current.focus({preventScroll:true});else document.getElementById('main')?.focus({preventScroll:true});});};
   useEffect(()=>{if(!detail)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('dialog[open]'))closeDetail();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[detail]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(timer);},[notice]);
   const change=useCallback<LibraryChange>((patch)=>{
@@ -278,10 +291,9 @@ export default function AnimeExperience(){
     window.animeTakvimi?.replaceLibrarySnapshot({...current.library,...(typeof patch==='function'?patch(current.library):patch)},{emit:true});
   },[]);
   const openDetail=(item:Anime)=>{window.animeTakvimi?.registerItems([item]);previousFocus.current=document.activeElement as HTMLElement;previousScroll.current=window.scrollY;setDetail(item);window.scrollTo({top:0});};
-  const closeDetail=()=>{setDetail(null);requestAnimationFrame(()=>{window.scrollTo({top:previousScroll.current});if(previousFocus.current?.isConnected)previousFocus.current.focus({preventScroll:true});else document.getElementById('main')?.focus({preventScroll:true});});};
   let publicUserId:string|undefined;
   if(hash.startsWith('profile=')){try{publicUserId=decodeURIComponent(hash.slice(8));}catch{publicUserId=hash.slice(8);}}
-  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
+  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
     {snapshot.ready&&<CatalogFilters page={page}/>}
     <AccountAvatarFrames ready={snapshot.ready} frameId={snapshot.account?.user?.avatarFrame}/>
     {notice&&<div className="exp-feedback" role="status">{notice}</div>}

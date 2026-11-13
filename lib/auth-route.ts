@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { headers } from 'next/headers';
+import {pushDeviceCookieValue} from './push.mjs';
 import { MembershipError, readJsonMutation } from './membership.mjs';
 import {
   createEmailAuthService, parseSessionCookie, sessionCookie, clearSessionCookie,
@@ -37,7 +38,8 @@ export async function runAuthMutation(request: Request, action: 'register' | 'lo
         throw new MembershipError(400, 'invalid_payload', 'Gönderilen bilgiler geçerli değil.');
       }
       await service.logout(parseSessionCookie(request.headers.get('cookie')));
-      return json({ok: true}, 200, clearSessionCookie(request.url));
+      const response = json({ok: true}, 200, clearSessionCookie(request.url));
+      response.headers.append('Set-Cookie', pushDeviceCookieValue(null, request.url)); return response;
     }
     const previousToken = parseSessionCookie(request.headers.get('cookie'));
     const result = action === 'register'

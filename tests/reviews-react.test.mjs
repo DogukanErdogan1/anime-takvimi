@@ -23,7 +23,8 @@ const names=new Set(['Reviews','api','avatarUrl','initial','dateLabel','userCanE
 const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&names.has(node.name?.text)).map(node=>node.getText(ast));
 assert.equal(functions.length,names.size,'exercise the actual production functions');
 const icons=ast.statements.find(node=>ts.isImportDeclaration(node)&&node.moduleSpecifier.text==='lucide-react').getText(ast);
-const code=`import {useState,useRef,useEffect} from './${path.basename(hooksFile)}';\n${icons}\n${functions.join('\n')}`;
+const code=`const ReportReview=()=>null;
+import {useState,useRef,useEffect} from './${path.basename(hooksFile)}';\n${icons}\n${functions.join('\n')}`;
 const componentFile=write('component',ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX}}).outputText);
 const hooks=await import(pathToFileURL(hooksFile).href),{Reviews}=await import(pathToFileURL(componentFile).href);
 after(()=>{for(const file of files)try{unlinkSync(file);}catch{}});

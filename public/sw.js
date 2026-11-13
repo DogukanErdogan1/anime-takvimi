@@ -51,3 +51,22 @@ self.addEventListener('notificationclick', event => {
     else await self.clients.openWindow(target);
   })());
 });
+
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    try {
+      const data = event.data?.json();
+      if (!data || typeof data.title !== 'string' || typeof data.body !== 'string' || typeof data.bindingId !== 'string' || !/^mal-[1-9]\d{0,9}$/.test(data.animeId)) return;
+      // Queued notifications must not reveal an old account's anime after
+      // logout, account switching, session expiry, or reminder removal.
+      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
+      let response;
+      try {response = await fetch('/api/push?anime=' + encodeURIComponent(data.animeId), {signal: controller.signal, credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}});}
+      finally {clearTimeout(timeout);}
+      if (!response.ok) return;
+      const current = await response.json();
+      if (!current.active || current.bindingId !== data.bindingId || current.reminderActive !== true) return;
+      await self.registration.showNotification(data.title.slice(0, 100), {body: data.body.slice(0, 240), tag: typeof data.tag === 'string' ? data.tag.slice(0, 180) : 'anime-reminder', icon: '/icon-192.png', badge: '/favicon.svg'});
+    } catch { /* Offline or revoked sessions never display private payloads. */ }
+  })());
+});

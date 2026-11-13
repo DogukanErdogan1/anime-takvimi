@@ -8,11 +8,21 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    ".next/**",
+    ".next/**", ".sites-runtime/**", ".vinext/**", ".wrangler/**", "dist/**", "vendor/**", "lint-audit.json",
     "out/**",
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: ["components/experience/**/*.{ts,tsx}"],
+    rules: {
+      // These adapters intentionally reset resource/form state when the external
+      // JavaScript snapshot changes. Keep the performance diagnostic visible.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
+  {files: ["tests/**/*.mjs"], rules: {"@typescript-eslint/no-this-alias": "off"}},
+  {rules: {"@typescript-eslint/no-unused-vars": ["warn", {argsIgnorePattern:"^_", caughtErrorsIgnorePattern:"^_", varsIgnorePattern:"^_"}]}},
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {

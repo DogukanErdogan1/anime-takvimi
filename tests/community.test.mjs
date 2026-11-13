@@ -62,7 +62,7 @@ test('an opted-in public profile shares only its own library and never email or 
   await service.putProfile(alice,{bio:'Anime fan',isPublic:true});
   const result = await service.getPublicProfile('alice');
   assert.deepEqual(result.profile,{id:'alice',displayName:'alice',bio:'Anime fan',isPublic:true,createdAt:'2026-10-17T10:00:00.000Z'});
-  const {reminders,...expected} = library(); assert.deepEqual(result.library,expected);
+  const {reminders:_reminders,...expected} = library(); assert.deepEqual(result.library,expected);
   assert.equal(JSON.stringify(result).includes('@'),false); assert.equal('reminders' in result.library,false);
   assert.equal(JSON.stringify(result).includes('Bobs private anime'),false);
   await status(()=>service.getPublicProfile('bob'),404);
@@ -201,4 +201,28 @@ test('the real migration enforces database-level review uniqueness, bounds and r
   assert.throws(()=>db.sqlite.prepare('UPDATE anime_reviews SET score=11 WHERE id=?').run(review.id),/CHECK/);
   assert.throws(()=>db.sqlite.prepare('UPDATE anime_reviews SET spoiler=3 WHERE id=?').run(review.id),/CHECK/);
   assert.throws(()=>db.sqlite.prepare('INSERT INTO member_profiles(user_id,bio,is_public) VALUES(?,?,?)').run('alice','x',2),/CHECK/);
+});
+
+
+import {createModerationService} from '../lib/moderation.mjs';
+test('reporting prevents self reports and duplicates and limits queue access to the bound administrator',async t=>{
+ const {db,service}=await fixture(t),moderation=createModerationService(db);
+ const review=(await service.postReview(alice,1,{body:'Spoiler',spoiler:false})).review;
+ await status(()=>moderation.report(alice,1,review.id,{reason:'spam',detail:''}),404);
+ await moderation.report(bob,1,review.id,{reason:'spoiler',detail:'Final bilgisi'});
+ await moderation.report(bob,1,review.id,{reason:'spam',detail:''});
+ assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS total FROM review_reports').get().total,1);
+ await status(()=>moderation.list(bob),403);
+ const reports=(await moderation.list(owner)).reports;assert.equal(reports.length,1);
+ await moderation.resolve(owner,reports[0].id,{action:'dismiss'});
+ assert.equal((await service.getReviews(1)).total,1);assert.equal((await moderation.list(owner)).reports.length,0);
+});
+test('administrator removal hides the reported review and closes its reports',async t=>{
+ const {db,service}=await fixture(t),moderation=createModerationService(db);
+ const review=(await service.postReview(alice,1,{body:'Spam'})).review;
+ await moderation.report(bob,1,review.id,{reason:'spam',detail:''});
+ const report=(await moderation.list(owner)).reports[0];
+ await status(()=>moderation.resolve(bob,report.id,{action:'remove'}),403);
+ await moderation.resolve(owner,report.id,{action:'remove'});
+ assert.equal((await service.getReviews(1)).total,0);assert.equal((await moderation.list(owner)).reports.length,0);
 });

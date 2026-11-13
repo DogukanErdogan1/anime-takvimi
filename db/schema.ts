@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const members = sqliteTable('members', {
   id: text('id').primaryKey(), email: text('email').notNull(), displayName: text('display_name').notNull(),
   role: text('role', {enum: ['admin','member']}).notNull().default('member'),
@@ -108,3 +108,15 @@ export const memberProfileFrames = sqliteTable('member_profile_frames', {
 },table=>[
   check('profile_frame_id_check',sql`${table.frameId} IN ('none','platin','yorunge','editor','kirik-halo','murekkep','panel','kristal','krom-akis','defne','krizantem','koi','yildiz-muhru')`),
 ]);
+
+export const reviewReports = sqliteTable('review_reports', {
+ id:text('id').primaryKey(),reviewId:text('review_id').notNull().references(()=>animeReviews.id),reporterId:text('reporter_id').notNull().references(()=>members.id),
+ reason:text('reason',{enum:['spoiler','abuse','spam','other']}).notNull(),detail:text('detail').notNull().default(''),status:text('status',{enum:['open','dismissed','removed']}).notNull().default('open'),createdAt:text('created_at').notNull(),resolvedAt:text('resolved_at'),resolvedBy:text('resolved_by').references(()=>members.id),
+},table=>[uniqueIndex('review_reports_author').on(table.reviewId,table.reporterId),index('review_reports_queue').on(table.status,table.createdAt)]);
+
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+ endpointHash:text('endpoint_hash').primaryKey(),userId:text('user_id').notNull().references(()=>members.id),subscriptionJson:text('subscription_json').notNull(),createdAt:text('created_at').notNull(),deviceHash:text('device_hash'),bindingId:text('binding_id'),sessionHash:text('session_hash').references(()=>authSessions.tokenHash,{onDelete:'cascade'}),
+},table=>[index('push_subscriptions_user').on(table.userId),index('push_session_idx').on(table.sessionHash),uniqueIndex('push_device_unique').on(table.deviceHash)]);
+export const pushDeliveries = sqliteTable('push_deliveries', {
+ endpointHash:text('endpoint_hash').notNull().references(()=>pushSubscriptions.endpointHash,{onDelete:'cascade'}),occurrence:text('occurrence').notNull(),status:text('status',{enum:['sending','sent','failed']}).notNull(),claimedAt:integer('claimed_at').notNull(),attempts:integer('attempts').notNull().default(1),
+},table=>[primaryKey({columns:[table.endpointHash,table.occurrence]})]);

@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Bell, Bookmark, Camera, Check, ChevronDown, CircleCheck, Clapperboard, Compass, ExternalLink, Eye, EyeOff, Heart, LayoutGrid, ListPlus, MessageCircle, Minus, Pencil, Play, Plus, Settings, Shield, Star, StarHalf, Trash2, X } from 'lucide-react';
 import type { Anime, Library, LibraryChange as Change, ExperienceSnapshot as Snapshot } from './types';
 import { advanceEpisode, watchStatus } from './model';
 import {WatchStatusSelect} from './watch-status-select';
 import {isAvatarFrame} from '../../lib/avatar-frames.mjs';
 import {AvatarFrame} from './avatar-frame';
+import {ReportReview,ModerationPanel} from './moderation';
+import ShareAnime from './share-anime';
+import LibraryTransfer from './library-transfer';
 import AvatarFramePicker from './avatar-frame-picker';
 
 const states = [
@@ -94,7 +97,10 @@ function allItems(snapshot: Snapshot, library: Library = snapshot.library): Anim
   for (const item of [...snapshot.catalog, ...snapshot.schedule, ...Object.values(library.savedAnime)]) if (item?.id) index.set(item.id, item);
   return [...new Set([...library.saved, ...Object.keys(library.tracking || {}), ...(library.favorites || []), ...(library.collections || []).flatMap(collection => collection.animeIds)])].map(id => index.get(id)).filter((item): item is Anime => Boolean(item));
 }
-export function AnimePoster({item,className='at-poster',showTitle=false}:{item:Anime;className?:string;showTitle?:boolean}) {
+export function AnimePoster({item,className='at-poster',showTitle=false,priority=false}:{item:Anime;className?:string;showTitle?:boolean;priority?:boolean}) {
+  const target=useRef<HTMLSpanElement>(null);
+  const [visible,setVisible]=useState(()=>priority||typeof IntersectionObserver==='undefined');
+  useEffect(()=>{if(visible||!target.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'240px'});observer.observe(target.current);return()=>observer.disconnect();},[visible]);
   const primary=imageUrl(item.image),key=`${item.malId}:${primary||''}`;
   const [failed,setFailed]=useState<{key:string;urls:string[]}>({key,urls:[]});
   const [cover,setCover]=useState<{key:string;url:string|null}>({key,url:null});
@@ -103,15 +109,15 @@ export function AnimePoster({item,className='at-poster',showTitle=false}:{item:A
   const alternate=cover.key===key?cover.url:null;
   const source=!needsFallback?primary:alternate&&!failures.includes(alternate)?alternate:null;
   useEffect(()=>{
-    if(!needsFallback || !Number.isSafeInteger(item.malId) || item.malId<1)return;
+    if(!visible || !needsFallback || !Number.isSafeInteger(item.malId) || item.malId<1)return;
     let active=true;
     const provider=window.AnimeBanners;
     if(provider?.resolvePoster)provider.resolvePoster(item.malId).then(value=>{
       if(active)setCover({key,url:provider.safePoster(value)});
     }).catch(()=>{});
     return()=>{active=false;};
-  },[key,needsFallback,item.malId]);
-  return <span className={className}>{source?<img key={source} src={source} alt={showTitle?item.title:`${item.title} afişi`} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>({key,urls:[...new Set([...(previous.key===key?previous.urls:[]),source])]}))}/>:showTitle?<span className="exp-poster-fallback">{item.title}</span>:<span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
+  },[key,needsFallback,item.malId,visible]);
+  return <span ref={target} className={className}>{source?<img key={source} src={source} alt={showTitle?item.title:`${item.title} afişi`} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} width={225} height={338} decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>({key,urls:[...new Set([...(previous.key===key?previous.urls:[]),source])]}))}/>:showTitle?<span className="exp-poster-fallback">{item.title}</span>:<span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
 }
 function Poster({item,className=''}:{item:Anime;className?:string}) {
   return <AnimePoster item={item} className={`at-poster ${className}`}/>;
@@ -311,7 +317,7 @@ export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime;
       <aside className="at-detail-media" aria-label="Anime fragmanı">
         <div className={'at-trailer-preview'+(trailer?' is-playable':'')}>
           {(banner||poster) && <img src={banner||poster!} alt="" aria-hidden="true" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.hidden=true;}}/>}
-          {trailer ? <a href={trailer} target="_blank" rel="noopener noreferrer"><span><Play size={25} fill="currentColor"/></span><strong>Fragmanı izle</strong><small>YouTube'da açılır</small></a> : <div className="at-trailer-unavailable"><Play size={24}/><span>{detailError?'Fragman bilgisi alınamadı':details?'Fragman bulunmuyor':'Fragman yükleniyor…'}</span></div>}
+          {trailer ? <a href={trailer} target="_blank" rel="noopener noreferrer"><span><Play size={25} fill="currentColor"/></span><strong>Fragmanı izle</strong><small>YouTube’da açılır</small></a> : <div className="at-trailer-unavailable"><Play size={24}/><span>{detailError?'Fragman bilgisi alınamadı':details?'Fragman bulunmuyor':'Fragman yükleniyor…'}</span></div>}
         </div>
         {detailError ? <p className="at-detail-media-note">{detailError} <button className="at-text-button" onClick={()=>retryDetail(value=>value+1)}>Tekrar dene</button></p> : !details && <p className="at-detail-media-note" role="status">Fragman ve bağlantılı seriler yükleniyor…</p>}
       </aside>
@@ -322,7 +328,7 @@ export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime;
       {!snapshot.account?.authenticated && <p className="at-signin-prompt">Listen bu tarayıcıda saklanır. Cihazların arasında eşitlemek ve yorum yazmak için <a href="/giris">giriş yap</a> veya <a href="/uye-ol">üye ol</a>.</p>}
       {snapshot.libraryLoading && <p className="at-muted" role="status">Hesap listen yükleniyor…</p>}
       {snapshot.blocked && <p className="at-muted">Hesabının düzenleme yetkisi şu anda kapalı.</p>}
-      <Reviews key={`${item.malId}:${snapshot.account?.user?.id || "guest"}`} item={item} snapshot={snapshot}/>
+      <ShareAnime malId={item.malId}/><Reviews key={`${item.malId}:${snapshot.account?.user?.id || "guest"}`} item={item} snapshot={snapshot}/>
     </div>
   </article>;
 }
@@ -465,6 +471,7 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
         <header className="at-review-author">{avatar(review.displayName, own)}<div className="at-review-author-copy"><strong>{review.displayName}{own && <span className="at-review-self">Sen</span>}</strong><time dateTime={review.createdAt}>{dateLabel(review.createdAt)}</time></div><div className="at-review-actions">{review.score != null && <span className="at-user-score"><Star size={13}/>{review.score}/10</span>}{editable && own && <button type="button" className="at-icon-button" aria-label="Kendi yorumunu düzenle" title="Yorumunu düzenle" disabled={busy} onClick={() => beginEdit(review)}><Pencil size={16}/></button>}{editable && (own || user?.role === 'admin') && <button type="button" className="at-icon-button" aria-label="Bu yorumu kaldır" title="Yorumu kaldır" aria-expanded={confirming === review.id} disabled={busy} onClick={() => setConfirming(confirming === review.id ? null : review.id)}><Trash2 size={16}/></button>}</div></header>
         {review.spoiler && <span className="at-review-spoiler-tag"><Shield size={12}/>Spoiler içeriyor</span>}
         {hidden ? <button type="button" className="at-spoiler-button" onClick={() => setRevealed(current => [...current, review.id])}><Eye size={18}/><span><strong>Spoiler içeren yorum</strong><small>Okumak için dokun.</small></span></button> : <><p className="at-review-body">{review.body}</p>{review.spoiler && <button type="button" className="at-review-rehide" onClick={() => setRevealed(current => current.filter(id => id !== review.id))}><EyeOff size={14}/>Spoileri yeniden gizle</button>}</>}
+        {editable && !own && <ReportReview animeId={item.malId} reviewId={review.id}/>}
         {confirming === review.id && <div className="at-review-remove-confirm" role="group" aria-label="Yorumu kaldırmayı onayla"><p>Bu yorum yayından kaldırılacak. İşlemi bu ekrandan geri alamazsın.</p><div><button type="button" className="at-text-button" disabled={busy} onClick={() => setConfirming(null)}>Vazgeç</button><button type="button" className="at-review-remove-button" disabled={busy} onClick={() => void hide(review)}>{hiding === review.id ? 'Kaldırılıyor…' : 'Yorumu kaldır'}</button></div></div>}
       </article>;
     })}</div>}
@@ -531,10 +538,12 @@ export function ProfileView({ snapshot, publicUserId, onClose, onChange, onOpenD
   const coverInput = useRef<HTMLInputElement>(null);
   const coverScope = `${publicUserId || 'own'}:${snapshot.account?.user?.id || 'guest'}:${snapshot.accountScope || 'guest'}`;
   const coverLifecycle = useRef({scope: coverScope, sequence: 0, alive: true, controller: null as AbortController | null});
+  useLayoutEffect(() => {
   if (coverLifecycle.current.scope !== coverScope) {
     coverLifecycle.current.controller?.abort();
     coverLifecycle.current = {scope: coverScope, sequence: coverLifecycle.current.sequence + 1, alive: true, controller: null};
   }
+  }, [coverScope]);
   useEffect(() => {
     const lifecycle = coverLifecycle.current;
     lifecycle.alive = true;
@@ -584,7 +593,7 @@ export function ProfileView({ snapshot, publicUserId, onClose, onChange, onOpenD
   const episodes = Object.values(library.progress).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
   const editable = isOwner && userCanEdit(snapshot);
   const frameAccount = useRef(coverScope);
-  frameAccount.current = coverScope;
+  useLayoutEffect(() => {frameAccount.current = coverScope;}, [coverScope]);
   const saveFrame = async (frameId: string, signal: AbortSignal) => {
     if (!editable || !profile || !member || profile.id !== member.id || !isAvatarFrame(frameId)) throw new Error('Çerçeve seçmek için hesabına giriş yapmalısın.');
     const scope = coverScope, profileId = profile.id;
@@ -670,6 +679,8 @@ export function ProfileView({ snapshot, publicUserId, onClose, onChange, onOpenD
       {coverError && <p className="at-error at-cover-feedback" role="alert">{coverError}</p>}
       {coverNotice && <p className="at-success at-cover-feedback" role="status">{coverNotice}</p>}
       {notice && <p className="at-success" role="status">{notice}</p>}
+      {editable && member && member.role==='admin' && <ModerationPanel/>}
+      {editable && <LibraryTransfer library={library} onChange={onChange} disabled={snapshot.libraryLoading||snapshot.blocked}/>}
       {editing && <form className="at-profile-edit" onSubmit={saveProfile}><label className="at-field" htmlFor="at-profile-bio">Kendinden bahset<textarea id="at-profile-bio" value={bio} maxLength={500} rows={3} onChange={event=>setBio(event.target.value)} placeholder="Sevdiğin hikâyeler, favori türlerin…"/></label><label className="at-check-label"><input type="checkbox" checked={isPublic} onChange={event=>setPublic(event.target.checked)}/> Profilimi ve anime listelerimi herkese aç</label><p className="at-muted">Açtığında adın, biyografin, listelerin ve izleme istatistiklerin profil bağlantısından görülebilir.</p>{saveError && <p className="at-error" role="alert">{saveError}</p>}<div className="at-edit-actions"><button type="button" className="at-text-button" onClick={()=>setEditing(false)}>Vazgeç</button><button className="at-primary-button" disabled={saving}>{saving?'Kaydediliyor…':'Değişiklikleri kaydet'}<Check size={15}/></button></div></form>}
       {isOwner && profile.isPublic && <div className="at-public-link"><span>Profil bağlantın</span><a href={'/#profile='+encodeURIComponent(profile.id)}>{typeof window!=='undefined'?window.location.origin:''}/#profile={profile.id}<ExternalLink size={12}/></a></div>}
       <section className="at-profile-favorites"><div className="at-section-line"><h2>{isOwner?'Vazgeçilmezlerim':'Favoriler'}</h2><button className="at-text-button" onClick={()=>jumpToLibrary('favorites')}>Tümünü gör <ArrowRight size={13}/></button></div>{favorites.length ? <div className="at-favorites-ribbon">{favorites.slice(0,7).map(item=><button className="at-profile-anime" key={item.id} onClick={()=>onOpenDetail(item)}><Poster item={item}/><span className="at-profile-anime-name">{item.title}</span></button>)}</div> : <p className="at-empty-note">{isOwner?'Kalbine dokunan hikâyeleri favorilerine ekle.':'Bu profilde henüz favori anime bulunmuyor.'}</p>}</section>
