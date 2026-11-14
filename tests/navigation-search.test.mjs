@@ -38,14 +38,15 @@ const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 const anime=(malId,title,extra={})=>({id:`mal-${malId}`,malId,title,original:title,synonyms:[],genres:['Aksiyon'],image:`https://cdn.myanimelist.net/images/anime/${malId}/poster.jpg`,format:'TV',year:2026,episodes:12,rating:8,members:1000,...extra});
 const naruto=anime(20,'Naruto',{members:2000}),shippuden=anime(1735,'Naruto: Shippuuden'),bebop=anime(1,'Cowboy Bebop'),frieren=anime(52991,'Sousou no Frieren',{synonyms:['Frieren: Beyond Journey’s End']});
 
-function setup(t){
+function setup(t,{wide=false}={}){
   const previous=Object.fromEntries(['window','requestAnimationFrame','cancelAnimationFrame','setTimeout','clearTimeout'].map(key=>[key,globalThis[key]]));
   const timers=new Map(),frames=new Map(),calls=[],details=[],events=[],refs=new Map();let number=0,tree=null,unmounted=false,visibleRefs=new Set();
   globalThis.setTimeout=(callback,delay)=>{const id=++number;timers.set(id,{callback,delay});return id;};
   globalThis.clearTimeout=id=>timers.delete(id);
   globalThis.requestAnimationFrame=callback=>{const id=++number;frames.set(id,callback);return id;};
   globalThis.cancelAnimationFrame=id=>frames.delete(id);
-  globalThis.window={dispatchEvent:event=>{events.push(event.type);return true;},AnimeData:{searchAnime:(query,options)=>new Promise((resolve,reject)=>calls.push({query,options,resolve,reject}))}};
+  const mediaListeners=new Set(),media={matches:wide,addEventListener(_type,callback){mediaListeners.add(callback);},removeEventListener(_type,callback){mediaListeners.delete(callback);}};
+  globalThis.window={matchMedia:()=>media,dispatchEvent:event=>{events.push(event.type);return true;},AnimeData:{searchAnime:(query,options)=>new Promise((resolve,reject)=>calls.push({query,options,resolve,reject}))}};
   const snapshot={catalog:[naruto,shippuden,bebop,frieren],schedule:[naruto],library:{savedAnime:{[naruto.id]:naruto}}};
   hooks.reset();
   function attach(){const next=new Set();walk(tree,node=>{const ref=node.props?.ref;if(!ref||typeof ref!=='object')return;next.add(ref);if(!refs.has(ref))refs.set(ref,{focuses:0,scrollTop:0,clientHeight:70,focus(){this.focuses++;},querySelector(){const options=[];walk(tree,option=>{if(option.props?.role==='option')options.push(option);});const selected=options.findIndex(option=>option.props['aria-selected']);return selected<0?null:{offsetTop:selected*70,offsetHeight:70,scrollIntoView(){assert.fail('keyboard selection must scroll only its list, never the document');}};}});ref.current=refs.get(ref);});for(const ref of visibleRefs)if(!next.has(ref))ref.current=null;visibleRefs=next;}
@@ -56,6 +57,7 @@ function setup(t){
   t.after(()=>{unmount();for(const[key,value]of Object.entries(previous)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}});
   render();
   return{calls,details,events,snapshot,render,byId,byLabel,unmount,
+    resizeWide(value){media.matches=value;for(const listener of mediaListeners)listener();return render();},
     open(){byLabel('Aramayı aç').props.onClick();render();for(const[id,callback]of [...frames]){frames.delete(id);callback();}return tree;},
     type(value){const input=byId('nav-anime-search');assert.ok(input);input.props.onChange({target:{value}});return render();},
     runDebounce(){for(const[id,entry]of [...timers])if(entry.delay===350){timers.delete(id);entry.callback();}},
@@ -104,4 +106,22 @@ test('open, result count changes, and close notify navbar layout so suggestions 
   const ui=setup(t);const initial=ui.events.length;ui.open();assert.ok(ui.events.length>initial);ui.type('cow');ui.runDebounce();const beforeResults=ui.events.length;
   ui.calls[0].resolve({anime:[anime(5,'Cowboy Bebop: Tengoku no Tobira')]});await settle();ui.render();assert.equal(ui.options().length,2);assert.ok(ui.events.length>beforeResults);
   const beforeClose=ui.events.length;ui.key('Escape');assert.ok(ui.events.length>beforeClose);assert.ok(ui.events.every(type=>type==='anime:navlayout'));
+});
+
+test('wide search remains editable after Escape and reopens suggestions from the keyboard',t=>{
+  const ui=setup(t,{wide:true});
+  assert.equal(ui.byLabel('Aramayı aç'),null);assert.ok(ui.byId('nav-anime-search'));assert.equal(ui.byId('nav-anime-search').props.ref.current.focuses,0,'a permanently visible search must not steal focus on page load');
+  assert.equal(ui.byId('nav-search-results'),null);assert.equal(ui.calls.length,0);
+  ui.type('nar');ui.runDebounce();assert.equal(ui.options().length,2);assert.equal(ui.calls.length,1);
+  ui.key('Escape');assert.equal(ui.calls[0].options.signal.aborted,true);assert.ok(ui.byId('nav-anime-search'));assert.equal(ui.byId('nav-search-results'),null);assert.equal(ui.byId('nav-anime-search').props['aria-expanded'],false);
+  ui.key('ArrowDown');assert.equal(ui.options()[0].props['aria-selected'],true);assert.equal(ui.byId('nav-anime-search').props['aria-expanded'],true);
+  ui.byLabel('Aramayı temizle').props.onClick();ui.render();assert.equal(ui.byId('nav-anime-search').props.value,'');assert.equal(ui.options().length,0);assert.equal(ui.byLabel('Aramayı temizle'),null);
+});
+
+test('resizing between compact and inline search preserves the query without duplicating or reviving requests',async t=>{
+  const ui=setup(t);ui.open();ui.type('nar');ui.runDebounce();const request=ui.calls[0];
+  ui.resizeWide(true);assert.equal(ui.byId('nav-anime-search').props.value,'nar');assert.equal(ui.byLabel('Aramayı aç'),null);assert.equal(ui.calls.length,1);assert.equal(request.options.signal.aborted,false);
+  ui.key('ArrowDown');ui.submit();assert.equal(ui.details[0],naruto);assert.ok(ui.byId('nav-anime-search'));assert.equal(ui.byId('nav-search-results'),null);assert.equal(request.options.signal.aborted,true);
+  request.resolve({anime:[anime(999,'Late Naruto')]});await settle();ui.render();assert.equal(ui.byId('nav-search-results'),null);
+  ui.resizeWide(false);assert.equal(ui.byId('nav-anime-search'),null);assert.ok(ui.byLabel('Aramayı aç'));ui.open();assert.equal(ui.byId('nav-anime-search').props.value,'nar');assert.equal(ui.options().length,2);
 });

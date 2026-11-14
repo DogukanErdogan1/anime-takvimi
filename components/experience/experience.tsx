@@ -77,7 +77,7 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
     <div className="exp-personal-strip">
       <div className="exp-discovery-layout">
         <div className="exp-discovery-copy">
-          <div className="exp-recommendation-title"><small>{saved.length?'SANA ÖZEL ÖNERİLER':'SEZONDAN SEÇTİKLERİMİZ'}</small><h2>Bir sonraki<br/>favorin<span>.</span></h2><p>{saved.length?'Sevdiğin hikâyelerden yola çıktık.':'Listeni oluştur, sana uygun hikâyeleri birlikte bulalım.'}</p></div>
+          <div className="exp-recommendation-title"><small>{saved.length?'SANA ÖZEL ÖNERİLER':'SEZONDAN SEÇTİKLERİMİZ'}</small><h2>Bir sonraki<br/>{' '}favorin<span>.</span></h2><p>{saved.length?'Sevdiğin hikâyelerden yola çıktık.':'Listeni oluştur, sana uygun hikâyeleri birlikte bulalım.'}</p></div>
         </div>
         <div className="exp-recommendation-area"><div className="exp-recommendation-posters">{picks.length?picks.map(({item,reason})=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{item.rating!==null&&<span className="exp-score"><Star size={12}/>{item.rating.toFixed(1)}</span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><p>{reason?reason+' sevdiğin için':item.genres.slice(0,3).join(' · ')||item.format}</p></article>):<p className="exp-muted">{snapshot.loading?'Öneriler hazırlanıyor…':snapshot.error||'Bu sezon için henüz öneri bulunamadı.'}</p>}</div>{suggestions.length>4&&<button className="exp-recommendation-next" aria-label="Sonraki anime önerileri" onClick={()=>setOffset(start+4>=suggestions.length?0:start+4)}><ChevronRight size={19}/></button>}</div>
       </div>
@@ -113,6 +113,7 @@ export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnaps
 function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapshot:ExperienceSnapshot;onDetail:(item:Anime)=>void}){
   const [query,setQuery]=useState('');
   const [expanded,setExpanded]=useState(false);
+  const [wide,setWide]=useState(false);
   const [activeId,setActiveId]=useState<string|null>(null);
   const [remote,setRemote]=useState<{query:string;items:Anime[];status:'idle'|'loading'|'ready'|'error'}>({query:'',items:[],status:'idle'});
   const input=useRef<HTMLInputElement>(null);
@@ -124,7 +125,12 @@ function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapsh
   const activeIndex=results.findIndex(item=>item.id===activeId);
   const loading=term.length>=2&&(remote.query!==term||remote.status==='loading'||remote.status==='idle');
   const failed=remote.query===term&&remote.status==='error';
-  useEffect(()=>{if(!expanded)return;const frame=requestAnimationFrame(()=>input.current?.focus());return()=>cancelAnimationFrame(frame);},[expanded]);
+  useEffect(()=>{
+    if(typeof window.matchMedia!=='function')return;
+    const media=window.matchMedia('(min-width:1280px)'),sync=()=>setWide(media.matches);
+    sync();media.addEventListener('change',sync);return()=>media.removeEventListener('change',sync);
+  },[]);
+  useEffect(()=>{if(!expanded)return;const frame=requestAnimationFrame(()=>input.current?.focus());return()=>cancelAnimationFrame(frame);},[expanded,wide]);
   useEffect(()=>{window.dispatchEvent(new Event('anime:navlayout'));},[expanded,term,results.length,remote.status]);
   useEffect(()=>{
     const viewport=list.current,option=viewport?.querySelector<HTMLElement>('[aria-selected="true"]');
@@ -148,22 +154,20 @@ function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapsh
     },350);
     return()=>{alive=false;clearTimeout(timer);controller.abort();};
   },[expanded,term]);
-  const close=(restoreFocus=false)=>{setExpanded(false);if(restoreFocus)toggle.current?.focus();};
+  const close=(restoreFocus=false)=>{setExpanded(false);setActiveId(null);if(restoreFocus&&!wide)toggle.current?.focus();};
   const choose=(item:Anime)=>{close(true);onDetail(item);};
   const status=term.length<2?'Anime bulmak için en az 2 karakter yaz.':loading?'Animeler aranıyor…':failed?(results.length?'Çevrimiçi arama yapılamadı. Mevcut eşleşmeler gösteriliyor.':'Arama şu an kullanılamıyor. Biraz sonra tekrar dene.'):results.length?`${results.length} öneri`:`“${term}” için sonuç bulunamadı.`;
-  return <div className="exp-nav-search-anchor">
-    <button ref={toggle} type="button" className={'exp-search-toggle'+(expanded?' is-open':'')} onClick={()=>{if(rail){setExpanded(true);input.current?.focus();}}} aria-label="Aramayı aç" aria-expanded={expanded} aria-controls="nav-search-panel"><Search size={19}/></button>
-    {expanded&&rail&&createPortal(<form id="nav-search-panel" className="exp-nav-search-panel" role="search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))close();}} onKeyDown={event=>{
+  const panel=<form id="nav-search-panel" className={'exp-nav-search-panel'+(wide?' is-inline':'')} role="search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))close();}} onKeyDown={event=>{
       if(event.nativeEvent.isComposing){if(event.key==='Enter')event.preventDefault();return;}
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);}
-      if(event.target===input.current&&(event.key==='ArrowDown'||event.key==='ArrowUp')&&results.length){event.preventDefault();const next=event.key==='ArrowDown'?(activeIndex+1)%results.length:activeIndex<=0?results.length-1:activeIndex-1;setActiveId(results[next].id);}
+      if(event.target===input.current&&(event.key==='ArrowDown'||event.key==='ArrowUp')&&results.length){event.preventDefault();setExpanded(true);const next=event.key==='ArrowDown'?(activeIndex+1)%results.length:activeIndex<=0?results.length-1:activeIndex-1;setActiveId(results[next].id);}
     }} onSubmit={event=>{event.preventDefault();const selected=results[activeIndex>=0?activeIndex:0];if(selected)choose(selected);else input.current?.focus();}}>
       <div className="exp-nav-search exp-nav-search-row is-open">
         <button type="submit" className="exp-search-trigger" aria-label="Seçili animeyi aç"><Search size={19}/></button>
-        <input ref={input} id="nav-anime-search" type="search" role="combobox" value={query} maxLength={100} onChange={event=>{setQuery(event.target.value);setActiveId(null);}} placeholder="Anime, seri veya tür ara…" aria-label="Anime, seri veya tür ara" autoComplete="off" spellCheck={false} aria-autocomplete="list" aria-expanded={results.length>0} aria-controls="nav-search-results" aria-activedescendant={activeIndex>=0?`nav-result-${results[activeIndex].id}`:undefined} aria-describedby="nav-search-status"/>
-        <button type="button" className="exp-search-close" onClick={()=>close(true)} aria-label="Aramayı kapat"><X size={16}/></button>
+        <input ref={input} id="nav-anime-search" type="search" role="combobox" value={query} maxLength={100} onFocus={()=>setExpanded(true)} onChange={event=>{setQuery(event.target.value);setActiveId(null);setExpanded(true);}} placeholder={wide?'Anime ara…':'Anime, seri veya tür ara…'} aria-label="Anime, seri veya tür ara" autoComplete="off" spellCheck={false} aria-autocomplete="list" aria-expanded={expanded&&results.length>0} aria-controls={expanded?'nav-search-results':undefined} aria-activedescendant={expanded&&activeIndex>=0?`nav-result-${results[activeIndex].id}`:undefined} aria-describedby={expanded?'nav-search-status':undefined}/>
+        {(!wide||query)&&<button type="button" className="exp-search-close" onClick={()=>{if(wide){setQuery('');setActiveId(null);setExpanded(true);input.current?.focus();}else close(true);}} aria-label={wide?'Aramayı temizle':'Aramayı kapat'}><X size={16}/></button>}
       </div>
-      <div className="exp-search-suggestions">
+      {expanded&&<div className="exp-search-suggestions">
         <div className="exp-search-status"><span id="nav-search-status" role="status" aria-live="polite">{status}</span>{results.length>0&&<small>↑ ↓ ile seç · Enter ile aç</small>}</div>
         <ul ref={list} id="nav-search-results" className="exp-search-results" role="listbox" aria-label="Anime önerileri" aria-busy={loading}>
           {results.map(item=><li id={`nav-result-${item.id}`} key={item.id} role="option" aria-selected={item.id===activeId} onMouseEnter={()=>setActiveId(item.id)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(item)}>
@@ -172,8 +176,11 @@ function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapsh
             {item.rating!==null&&<span className="exp-search-rating"><Star size={12}/>{item.rating.toFixed(1)}</span>}<ChevronRight size={15} aria-hidden="true"/>
           </li>)}
         </ul>
-      </div>
-    </form>,rail)}
+      </div>}
+    </form>;
+  return <div className={'exp-nav-search-anchor'+(wide?' is-inline':'')}>
+    {!wide&&<button ref={toggle} type="button" className={'exp-search-toggle'+(expanded?' is-open':'')} onClick={()=>{if(rail){setExpanded(true);input.current?.focus();}}} aria-label="Aramayı aç" aria-expanded={expanded} aria-controls="nav-search-panel"><Search size={19}/></button>}
+    {wide?panel:expanded&&rail?createPortal(panel,rail):null}
   </div>;
 }
 function useNavigationEffects(page:string,ready:boolean){
