@@ -70,7 +70,7 @@ function setup({hash='',now=fixedTime,loadSeason=async()=>response([]),getSeason
   function dispatch(type,target){const event={type,target,preventDefault(){},key:''};for(const handler of target.listeners.get(type)||[])handler(event);for(const handler of listeners.get(type)||[])handler(event);}
   const click=(dataset={},attributes=[])=>{const button=new Element('','BUTTON');button.dataset={...dataset};for(const attribute of attributes)button.setAttribute(attribute,'');dispatch('click',button);};
   const change=(id,value)=>{const node=nodes.get(id);assert.ok(node,`actual markup must include #${id}`);node.value=String(value);dispatch('change',node);};
-  return {window,document,nodes,requests,previewRequests,mapCalls,mapSnapshots,scheduleRequests,click,change,state:()=>window.animeTakvimi.getState(),
+  return {window,document,nodes,requests,previewRequests,mapCalls,mapSnapshots,scheduleRequests,click,change,dispatch,state:()=>window.animeTakvimi.getState(),
     advanceTo(value,{tick=true}={}){clock.now=Date.parse(value);if(tick)for(const handler of intervals)handler();},
     setHidden(hidden){document.hidden=hidden;for(const handler of listeners.get('visibilitychange')||[])handler({type:'visibilitychange'});},
     focus(){window.dispatchEvent({type:'focus'});},
@@ -90,6 +90,27 @@ test('seasons navigation opens the four-quarter library instead of the catalog o
   assert.deepEqual(ui.mapCalls,[]);
   assert.doesNotMatch(staticHtml,/id="home-schedule-map"/);
   assert.doesNotMatch(readFileSync(new URL('../app/anime-markup.ts',import.meta.url),'utf8'),/home-schedule-map/);
+});
+
+test('native catalog posters try the same-origin proxy before a matched alternative',async()=>{
+  const ui=setup(),placeholder={hidden:true},calls=[];
+  const cover='https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-example.jpg';
+  ui.window.AnimeBanners={resolvePoster:async id=>{calls.push(id);return cover;},safePoster:value=>value===cover?value:null};
+  const image={tagName:'IMG',dataset:{malPoster:'21'},hidden:false,isConnected:true,src:anime(21).image,closest:()=>({querySelector:()=>placeholder}),listeners:new Map()};
+  ui.dispatch('error',image);assert.equal(image.src,'/api/posters/21');assert.equal(image.hidden,false);assert.equal(placeholder.hidden,true);assert.deepEqual(calls,[]);
+  ui.dispatch('error',image);assert.equal(image.hidden,true);await flush();
+  assert.deepEqual(calls,[21]);assert.equal(image.src,cover);assert.equal(image.hidden,false);assert.equal(placeholder.hidden,true);
+  ui.dispatch('error',image);await flush();assert.deepEqual(calls,[21]);assert.equal(image.hidden,true);
+});
+
+test('late native poster lookups cannot replace detached or reused image elements',async()=>{
+  for(const reused of [false,true]){
+    const ui=setup();let finish;
+    ui.window.AnimeBanners={resolvePoster:()=>new Promise(resolve=>{finish=resolve;}),safePoster:value=>value};
+    const image={tagName:'IMG',dataset:{malPoster:'21',posterProxy:'true'},hidden:false,isConnected:true,src:'/api/posters/21',closest:()=>({querySelector:()=>null}),listeners:new Map()};
+    ui.dispatch('error',image);if(reused)image.dataset.malPoster='22';else image.isConnected=false;
+    finish('https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-example.jpg');await flush();assert.equal(image.src,'/api/posters/21');
+  }
 });
 
 test('direct seasons hash opens the library and year controls update all four season targets',async()=>{

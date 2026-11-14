@@ -102,22 +102,30 @@ export function AnimePoster({item,className='at-poster',showTitle=false,priority
   const [visible,setVisible]=useState(()=>priority||typeof IntersectionObserver==='undefined');
   useEffect(()=>{if(visible||!target.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'240px'});observer.observe(target.current);return()=>observer.disconnect();},[visible]);
   const primary=imageUrl(item.image),key=`${item.malId}:${primary||''}`;
-  const [failed,setFailed]=useState<{key:string;urls:string[]}>({key,urls:[]});
-  const [cover,setCover]=useState<{key:string;url:string|null}>({key,url:null});
+  const [failed,setFailed]=useState<{key:string;attempt:number;urls:string[]}>({key,attempt:0,urls:[]});
+  const [cover,setCover]=useState<{key:string;url:string|null;settled:boolean}>({key,url:null,settled:false});
   const failures=failed.key===key?failed.urls:[];
-  const needsFallback=!primary||failures.includes(primary);
+  const attempt=failed.key===key?failed.attempt:0;
+  const proxy=Number.isSafeInteger(item.malId)&&item.malId>0&&item.malId<=2147483647?`/api/posters/${item.malId}`:null;
   const alternate=cover.key===key?cover.url:null;
-  const source=!needsFallback?primary:alternate&&!failures.includes(alternate)?alternate:null;
+  const source=primary&&!failures.includes(primary)?primary:proxy&&!failures.includes(proxy)?proxy:alternate&&!failures.includes(alternate)?alternate:null;
+  const needsFallback=visible&&Boolean(proxy)&&failures.includes(proxy!);
   useEffect(()=>{
-    if(!visible || !needsFallback || !Number.isSafeInteger(item.malId) || item.malId<1)return;
+    if(!needsFallback)return;
     let active=true;
     const provider=window.AnimeBanners;
-    if(provider?.resolvePoster)provider.resolvePoster(item.malId).then(value=>{
-      if(active)setCover({key,url:provider.safePoster(value)});
-    }).catch(()=>{});
+    const finish=(url:string|null)=>{if(active)setCover({key,url,settled:true});};
+    if(provider?.resolvePoster)provider.resolvePoster(item.malId).then(value=>finish(provider.safePoster(value))).catch(()=>finish(null));
+    else finish(null);
     return()=>{active=false;};
-  },[key,needsFallback,item.malId,visible]);
-  return <span ref={target} className={className}>{source?<img key={source} src={source} alt={showTitle?item.title:`${item.title} afişi`} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} width={225} height={338} decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>({key,urls:[...new Set([...(previous.key===key?previous.urls:[]),source])]}))}/>:showTitle?<span className="exp-poster-fallback">{item.title}</span>:<span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
+  },[key,needsFallback,item.malId]);
+  const exhausted=visible&&Boolean(proxy)&&!source&&cover.key===key&&cover.settled;
+  useEffect(()=>{
+    if(!exhausted||attempt>0)return;
+    const timer=setTimeout(()=>setFailed({key,attempt:1,urls:[]}),3000);
+    return()=>clearTimeout(timer);
+  },[key,exhausted,attempt]);
+  return <span ref={target} className={className}>{source?<img key={`${source}:${attempt}`} src={source} alt={showTitle?item.title:`${item.title} afişi`} loading={priority?"eager":"lazy"} fetchPriority={priority?"high":"auto"} width={225} height={338} decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(previous=>({key,attempt:previous.key===key?previous.attempt:0,urls:[...new Set([...(previous.key===key?previous.urls:[]),source])]}))}/>:showTitle?<span className="exp-poster-fallback">{item.title}</span>:<span className="at-poster-missing"><Bookmark size={24}/><small>Afiş bulunamadı</small></span>}</span>;
 }
 function Poster({item,className=''}:{item:Anime;className?:string}) {
   return <AnimePoster item={item} className={`at-poster ${className}`}/>;

@@ -73,7 +73,7 @@ test('unsafe API image and external MAL URLs are excluded from rendered detail',
   assert.doesNotMatch(html, /attacker\.example/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.match(html, /Afiş bulunamadı/);
+  assert.match(html, /src="\/api\/posters\/123"/);
 });
 
 test('unknown episode totals stay unknown and completed series cannot increment', () => {
@@ -200,7 +200,7 @@ test('read-only library cards have no progress mutation controls and unsafe imag
   const tree=ProfileAnimeCard({item:{...item,image:'https://attacker.example/image.jpg'},library:library(),canEdit:false,onChange(){throw Error('Read-only card cannot mutate');},onOpenDetail(){}});
   assert.equal(findElement(tree,node=>node.props?.className==='at-library-advance'),null);
   const html=renderToStaticMarkup(tree);
-  assert.doesNotMatch(html,/attacker\.example/);assert.match(html,/Afiş bulunamadı/);
+  assert.doesNotMatch(html,/attacker\.example/);assert.match(html,/src="\/api\/posters\/123"/);
 });
 
 

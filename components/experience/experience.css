@@ -133,7 +133,7 @@ html[data-theme=dark] .at-success{color:#a6dbc2}
 @media(max-width:1200px){body[data-experience=true] .site-masthead .nav-items{gap:13px}body[data-experience=true] .site-masthead .rail{gap:19px}.exp-hero-copy{padding-top:42px}.exp-today{width:235px}.exp-recommendations{gap:27px}.exp-recommendation-posters{gap:12px}.exp-library-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.site-masthead .exp-hero-copy h1{font-size:70px}.exp-hero-anime>div{max-width:390px}}
 @media(max-width:980px){body[data-experience=true] .site-masthead .rail{display:flex;flex-wrap:wrap;min-height:0;padding:15px 0 0;gap:8px 16px}body[data-experience=true] .site-masthead .nav-items{gap:20px;justify-content:space-between}body[data-experience=true] .site-masthead .nav-item{flex-direction:row;min-height:46px}.exp-today{display:none}.exp-cinema{min-height:460px}.exp-hero-copy{padding:40px 0 55px}.exp-recommendations{grid-template-columns:.85fr 2fr;gap:23px}.exp-recommendation-title h2{font-size:44px}.exp-recommendation-title p{font-size:13px}.exp-recommendation-posters{grid-template-columns:repeat(3,minmax(0,1fr))}.exp-recommendation-posters article:nth-child(4){display:none}.exp-status-tabs{gap:21px}.exp-library-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.exp-continue-row{gap:16px}.exp-continue-card{padding-right:12px;gap:10px}.exp-cover-button{width:45px;flex-basis:45px}.exp-title-link{font-size:13px!important}}
 @media(max-width:600px){body[data-experience=true]{--page-gutter:20px}body[data-experience=true] .site-masthead .rail-brand .brand-logo{width:125px}body[data-experience=true] .site-masthead .rail{gap:9px 8px}body[data-experience=true] .site-masthead .nav-account{gap:3px;max-width:calc(100% - 133px)}body[data-experience=true] .account-identity{font-size:0;max-width:40px;padding:0}body[data-experience=true] .account-identity .avatar{font-size:12px}body[data-experience=true] .account-avatar{width:29px;height:29px}body[data-experience=true] .site-masthead .account-link{font-size:10px;padding:7px}body[data-experience=true] .site-masthead .account-toolbar .primary-button{padding:7px 9px;min-height:34px;border-radius:5px}body[data-experience=true] .site-masthead .nav-items{gap:10px}body[data-experience=true] .site-masthead .nav-item{font-size:10px;gap:5px;flex:1 1 auto}body[data-experience=true] .site-masthead .nav-item .icon{width:14px;height:14px}body[data-experience=true] .site-masthead .nav-count{position:static;min-width:14px;height:14px}.site-masthead .exp-hero-copy h1{font-size:clamp(49px,12vw,70px);margin-bottom:28px}.exp-cinema{min-height:475px}.exp-cinema-art{object-position:65% 30%}.exp-cinema-shade{background:linear-gradient(90deg,#0e202ee8,#0e202e55),linear-gradient(0deg,#102331 0%,transparent 60%)}.exp-hero-copy{padding:34px 0 55px}.exp-welcome{font-size:13px}.exp-hero-anime{gap:12px}.exp-hero-anime>button{width:62px;flex-basis:62px}.exp-hero-anime h2{font-size:23px}.exp-hero-anime small{font-size:7px}.exp-hero-anime p{font-size:10px}.exp-hero-actions{gap:9px;margin-top:13px}.exp-primary,.exp-hero-detail{padding:10px 12px;min-height:39px;font-size:10px!important}.exp-hero-detail{gap:8px}.exp-status-tabs{gap:21px;min-height:57px}.exp-status-tabs>button{font-size:11px;padding:18px 0 16px;min-height:57px}.exp-status-tabs>a{display:none}.exp-recommendations{display:block;padding-top:30px}.exp-recommendation-title>small{font-size:8px}.exp-recommendation-title h2{font-size:43px;margin:12px 0}.exp-recommendation-title h2 br{display:none}.exp-recommendation-title p{max-width:none;margin:10px 0 16px}.exp-recommendation-title>a{font-size:10px;margin-bottom:23px}.exp-recommendation-posters{grid-template-columns:repeat(2,minmax(0,1fr));gap:23px 14px}.exp-recommendation-posters article:nth-child(4){display:block}.exp-recommendation-posters .exp-title-link{font-size:15px!important}.exp-recommendation-posters article>p{font-size:10px}.exp-personal-strip{padding-bottom:28px}.exp-continue-row{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-top:19px;padding-bottom:8px}.exp-continue-card{flex:0 0 82%;scroll-snap-align:start;gap:12px}.exp-cover-button{width:56px;flex-basis:56px}.exp-continue-card .exp-title-link{font-size:15px!important}.exp-continue-card p{font-size:11px}.exp-increment{font-size:11px!important}.exp-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:27px 16px}.exp-watchlist{padding-top:30px}.exp-page-heading h1{font-size:44px}.exp-page-heading>p{font-size:14px}.exp-detail-dialog{width:100%;max-height:100dvh;height:100dvh;border:0;border-radius:0}.exp-status-select{flex-direction:column;align-items:start}.exp-status-select select{font-size:12px;padding:9px}.exp-empty{padding:60px 10px}.exp-empty h2{font-size:27px}}
-@media(max-width:380px){body[data-experience=true]{--page-gutter:16px}body[data-experience=true] .site-masthead .rail-brand .brand-logo{width:108px}body[data-experience=true] .site-masthead .nav-account{max-width:calc(100% - 112px)}body[data-experience=true] .site-masthead .nav-item{font-size:9px;gap:4px}.exp-hero-anime>button{display:none}.exp-status-tabs{gap:16px}.exp-hero-copy h1{font-size:49px!important}}
+@media(max-width:380px){body[data-experience=true]{--page-gutter:16px}body[data-experience=true] .site-masthead .rail-brand .brand-logo{width:108px}body[data-experience=true] .site-masthead .nav-account{max-width:calc(100% - 112px)}body[data-experience=true] .site-masthead .nav-item{font-size:9px;gap:4px}.exp-hero-anime>button{display:none}.exp-status-tabs{gap:16px}.exp-hero-copy h1{font-size:49px}}
 @media(prefers-reduced-motion:reduce){.exp-home *,.exp-watchlist *{transition:none!important}html{scroll-behavior:auto}}
 @media(max-width:380px){body[data-experience=true] .site-masthead .rail-brand .brand-logo{width:100px}.experience-control{width:28px;height:30px}}
 
@@ -451,3 +451,53 @@ html[data-theme=dark] :is(.at-watch-status-trigger,.at-watch-status-option)[data
 
 /* Keep the hero crop and title stable across the compact tablet breakpoint. */
 @media(min-width:421px) and (max-width:640px){.exp-cinema{min-height:300px}.site-masthead .exp-hero-copy h1{font-size:clamp(32px,7.2vw,46px);max-width:none;line-height:1.02;white-space:nowrap}}
+
+/* Put the library and today's schedule close to the navigation. */
+.exp-watchlist {padding-top:22px;}
+.exp-library-heading {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px 24px;padding-bottom:12px;}
+.exp-library-heading>div {min-width:0;}
+.exp-library-heading small {font-size:9px;letter-spacing:.16em;font-weight:600;color:var(--coral-dark);}
+.exp-library-heading h1 {font-size:clamp(28px,3.2vw,42px);line-height:1.1;letter-spacing:-.04em;margin:7px 0 6px;}
+.exp-library-heading p {margin:0;color:var(--muted);font:13px/1.5 var(--sans);}
+.exp-library-heading .at-library-transfer {justify-self:end;}
+.exp-library-heading:has(.at-transfer-preview) .at-library-transfer {grid-column:1/-1;justify-self:stretch;}
+.exp-watchlist .exp-status-tabs {min-height:48px;}
+.exp-watchlist .exp-status-tabs>button {min-height:48px;padding-block:13px 11px;}
+.exp-watchlist .exp-library-grid {padding-top:20px;}
+body[data-page=schedule] .site-masthead {padding-bottom:16px;}
+body[data-page=schedule] .site-masthead .page-header {padding-top:18px;}
+body[data-page=schedule] .site-masthead .heading-block {max-width:100%;}
+body[data-page=schedule] .site-masthead .eyebrow {display:none;}
+body[data-page=schedule] .site-masthead h1 {font-size:clamp(28px,3vw,42px);line-height:1.1;}
+body[data-page=schedule] .site-masthead .page-header p {font:13px/1.5 var(--sans);margin-top:6px;}
+body:is([data-page=schedule],[data-page=watchlist]) .main-panel>.account-status:not(.error):not(.loading) {display:none;}
+body[data-page=schedule] .main-panel .catalog {padding-top:8px;}
+body[data-page=schedule] .data-toolbar {margin-top:0;margin-bottom:8px;}
+@media(max-width:680px) {
+  .exp-watchlist {padding-top:16px;}
+  .exp-library-heading {gap:10px;padding-bottom:8px;}
+  .exp-library-heading h1 {font-size:28px;margin:0;}
+  .exp-library-heading>div>small,.exp-library-heading>div>p {display:none;}
+  .exp-library-heading .at-transfer-trigger {min-height:44px;padding:9px 10px;font-size:11px;gap:6px;}
+  .exp-library-heading .at-transfer-trigger>svg:first-child {display:none;}
+  .exp-watchlist .exp-status-tabs {gap:20px;}
+  .exp-watchlist .exp-library-grid {padding-top:16px;gap:24px 14px;}
+  body[data-page=schedule] .site-masthead {padding-bottom:10px;}
+  body[data-page=schedule] .site-masthead .page-header {padding-top:16px;}
+  body[data-page=schedule] .site-masthead h1 {font-size:28px;}
+  body[data-page=schedule] .site-masthead .page-header p {display:none;}
+  body[data-page=schedule] .data-toolbar {padding-block:4px;}
+  body[data-page=schedule] .broadcast-map:not(.broadcast-preview)>.map-week-nav {margin-bottom:8px;}
+  body[data-page=schedule] .broadcast-map:not(.broadcast-preview) .map-toolbar {gap:8px;padding-block:10px;}
+  body[data-page=schedule] .map-mobile-agenda {margin-top:12px;}
+  body[data-page=schedule] .map-day-tab {min-height:64px;padding-block:6px;}
+  body[data-page=schedule] .map-agenda-heading {margin-block:12px;}
+  body[data-page=schedule] .broadcast-map:not(.broadcast-preview)>.map-next {order:5;}
+  body[data-page=schedule] .broadcast-map:not(.broadcast-preview)>.map-note {order:6;}
+  .exp-cinema {min-height:0;}
+  .exp-hero-copy {padding-block:20px 24px;}
+  .site-masthead .exp-hero-copy h1 {font-size:clamp(30px,7vw,42px);margin-bottom:15px;line-height:1.08;white-space:normal;}
+  .exp-recommendation-title {padding-top:12px;}
+  .exp-recommendation-title h2 {font-size:clamp(28px,6.5vw,38px);line-height:1.1;margin-block:8px;}
+  .exp-personal-strip {padding-top:18px;}
+}

@@ -93,8 +93,8 @@ export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnaps
   const items=saved.filter(item=>tab==='all'||(tab==='favorites'?library.favorites.includes(item.id):watchStatus(item,library)===tab));
   const editable=snapshot.ready&&!snapshot.blocked&&!snapshot.libraryLoading&&snapshot.account?.user?.status!=='suspended';
   return <section className="exp-watchlist">
-    <header className="exp-page-heading"><small>KİŞİSEL KÜTÜPHANEN</small><h1>Her hikâyenin<br/>bir yeri var<span>.</span></h1><p>İzlediklerin, beklettiklerin, yeniden döneceklerin.</p></header>
-    <LibraryTransfer key={snapshot.accountScope||'guest'} library={library} onChange={onChange} disabled={!editable}/><div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele">
+    <header className="exp-page-heading exp-library-heading"><div><small>KİŞİSEL KÜTÜPHANEN</small><h1>Anime listem<span>.</span></h1><p>İzlediklerin ve sıradaki hikâyelerin.</p></div><LibraryTransfer key={snapshot.accountScope||'guest'} library={library} onChange={onChange} disabled={!editable} compact/></header>
+    <div className="exp-status-tabs" role="group" aria-label="Listeyi filtrele">
       <button type="button" className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{saved.length}</span></button>
       {statuses.map(status=><button type="button" key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}
       <button type="button" className={tab==='favorites'?'active':''} aria-pressed={tab==='favorites'} onClick={()=>setTab('favorites')}><Heart size={13} aria-hidden="true"/> Favoriler <span>{favorites.length}</span></button>

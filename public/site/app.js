@@ -260,7 +260,8 @@
 
   function chips(item, limit = Infinity) { return item.genres.slice(0, limit).map(genre => `<span class="genre-chip">${escape(genre)}</span>`).join(''); }
   function poster(item, { eager = false } = {}) {
-    return `${item.image ? `<img data-mal-poster="${item.malId}" src="${escape(item.image)}" alt="${escape(item.title)} posteri" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="image-placeholder"${item.image ? ' hidden' : ''}>${icon('bookmark')}<span>Poster bulunamadı</span></span>`;
+    const source=item.image||(Number.isSafeInteger(item.malId)&&item.malId>0&&item.malId<=2147483647?`/api/posters/${item.malId}`:null);
+    return `${source ? `<img data-mal-poster="${item.malId}"${!item.image?' data-poster-proxy="true"':''} src="${escape(source)}" alt="${escape(item.title)} posteri" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="image-placeholder"${source ? ' hidden' : ''}>${icon('bookmark')}<span>Poster bulunamadı</span></span>`;
   }
   function art(item, classes) { return `<div class="${classes} art remote-art">${poster(item)}</div>`; }
   function bookmarkButton(item) {
@@ -690,13 +691,20 @@
       const image=event.target;
       image.hidden = true; const placeholder = container.querySelector('.image-placeholder'); if (placeholder) placeholder.hidden = false;
       const malId=Number(image.dataset.malPoster),provider=window.AnimeBanners;
-      if(image.dataset.posterFallback || !Number.isSafeInteger(malId) || malId<1 || !provider?.resolvePoster)return;
+      if(!Number.isSafeInteger(malId) || malId<1 || malId>2147483647)return;
+      const show=source=>{if(!source||!image.isConnected||Number(image.dataset.malPoster)!==malId)return;image.src=source;image.hidden=false;if(placeholder)placeholder.hidden=true;};
+      const retry=()=>{
+        if(image.dataset.posterRetry)return;
+        image.dataset.posterRetry='true';
+        setTimeout(()=>show(`/api/posters/${malId}`),3000);
+      };
+      if(!image.dataset.posterProxy){image.dataset.posterProxy='true';show(`/api/posters/${malId}`);return;}
+      if(image.dataset.posterFallback || !provider?.resolvePoster){retry();return;}
       image.dataset.posterFallback='true';
       provider.resolvePoster(malId).then(value=>{
         const source=provider.safePoster(value);
-        if(!source || !image.isConnected || Number(image.dataset.malPoster)!==malId)return;
-        image.src=source;image.hidden=false;if(placeholder)placeholder.hidden=true;
-      }).catch(()=>{});
+        if(source)show(source);else retry();
+      }).catch(retry);
     }, true);
     document.addEventListener('change', event => { const input = event.target.closest('[data-progress-id]'); if (input) setProgress(input.dataset.progressId, input.value); });
     document.addEventListener('click', event => {
