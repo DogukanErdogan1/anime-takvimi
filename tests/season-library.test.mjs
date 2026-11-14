@@ -11,7 +11,7 @@ const response=items=>({anime:items,fetchedAt:fixedTime,stale:false});
 const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
 const countCards=html=>(html.match(/class="anime-card(?: |")/g)||[]).length;
 
-function setup({hash='',now=fixedTime,loadSeason=async()=>response([]),getSeasonPreview=async()=>response([])}={}){
+function setup({hash='',now=fixedTime,loadSeason=async()=>response([]),getSeasonPreview=async()=>response([]),getSchedule=async()=>response([])}={}){
   const nodes=new Map(),listeners=new Map(),windowListeners=new Map(),requests=[],previewRequests=[],mapCalls=[],mapSnapshots=[],scheduleRequests=[],intervals=[],layoutListeners=[];
   const clock={now};
   class ClockDate extends Date { constructor(...args){super(...(args.length?args:[clock.now]));} static now(){return clock.now;} }
@@ -55,7 +55,7 @@ function setup({hash='',now=fixedTime,loadSeason=async()=>response([]),getSeason
     AnimeData:{
       loadSeason(year,season,options){requests.push({year,season,options});return loadSeason(year,season,options);},
       getSeasonPreview(year,season,options){previewRequests.push({year,season,options});return getSeasonPreview(year,season,options);},
-      getSchedule:async()=>{scheduleRequests.push(clock.now);return response([]);},
+      getSchedule:async options=>{scheduleRequests.push(clock.now);return getSchedule(options);},
     },
     AnimeScheduleView:{mount(target,{state,focusNow}){if(target){mapCalls.push(target.id);mapSnapshots.push({week:state.week.map(date=>date.toISOString().slice(0,10)),day:state.day,weekOffset:state.weekOffset,mapPastOpen:state.mapPastOpen,focusNow});}return 0;}},
   };
@@ -90,6 +90,45 @@ test('seasons navigation opens the four-quarter library instead of the catalog o
   assert.deepEqual(ui.mapCalls,[]);
   assert.doesNotMatch(staticHtml,/id="home-schedule-map"/);
   assert.doesNotMatch(readFileSync(new URL('../app/anime-markup.ts',import.meta.url),'utf8'),/home-schedule-map/);
+});
+
+test('native progress records actual changes and undo restores both progress and private history',async()=>{
+ const ui=setup();await flush();const app=ui.window.animeTakvimi,item=anime(21);
+ const base={saved:[item.id],savedAnime:{[item.id]:item},reminders:[],progress:{[item.id]:0},view:'grid',tracking:{},scores:{},favorites:[],collections:[]};
+ app.replaceLibrarySnapshot(base,{emit:false});app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:2}},{emit:true});
+ let library=app.getLibrarySnapshot();assert.equal(library.activity.length,1);assert.equal(library.activity[0].from,0);assert.equal(library.activity[0].to,2);assert.equal(library.activity[0].at,fixedTime);
+ assert.equal(app.undoLibraryChange(),true);library=app.getLibrarySnapshot();assert.equal(library.progress[item.id],0);assert.deepEqual(Array.from(library.activity),[]);assert.equal(app.undoLibraryChange(),false);
+ app.replaceLibrarySnapshot({...library,progress:{[item.id]:12}},{emit:true,recordActivity:false});assert.equal(app.getLibrarySnapshot().activity.length,0,'imported progress must not fabricate activity for today');
+});
+
+test('undo expires and can never cross account or permission boundaries',async()=>{
+ const ui=setup();await flush();const app=ui.window.animeTakvimi,item=anime(21),base={saved:[item.id],savedAnime:{[item.id]:item},reminders:[],progress:{},view:'grid'};
+ app.replaceLibrarySnapshot(base,{emit:false});app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:1}},{emit:true});ui.advanceTo(new Date(fixedTime+10001).toISOString(),{tick:false});assert.equal(app.undoLibraryChange(),false);
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:2}},{emit:true});app.setAccountScope('other-account',base);assert.equal(app.undoLibraryChange(),false);assert.equal(app.getLibrarySnapshot().progress[item.id],undefined);
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:1}},{emit:true});ui.window.AnimeMembership={getStatus:()=>({blocked:true})};assert.equal(app.undoLibraryChange(),false);
+});
+
+test('native save and removal remain undoable when the schedule refreshes source metadata',async()=>{
+ const item=anime(21),updated={...item,title:'Updated source title'};
+ const ui=setup({loadSeason:async()=>response([item]),getSchedule:async()=>response([updated])});await flush();const app=ui.window.animeTakvimi;
+ ui.click({action:'save',id:item.id});assert.equal(app.getLibrarySnapshot().saved.length,1);
+ await app.loadSchedule();assert.equal(app.getLibrarySnapshot().savedAnime[item.id].title,updated.title);
+ assert.equal(app.undoLibraryChange(),true);assert.equal(app.getLibrarySnapshot().saved.length,0);
+ ui.click({action:'save',id:item.id});ui.click({action:'save',id:item.id});
+ await app.loadSchedule();assert.equal(app.undoLibraryChange(),true);
+ assert.equal(app.getLibrarySnapshot().saved[0],item.id);assert.equal(app.getLibrarySnapshot().savedAnime[item.id].title,updated.title);
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:1}},{emit:true});
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:3}},{emit:false});assert.equal(app.undoLibraryChange(),false,'a server replacement must still invalidate undo');
+});
+
+test('advanced filters combine multiple genres, score, episode count, studio and source status',async()=>{
+ const a={...anime(21),genres:['Aksiyon','Fantastik'],rating:8.5,episodes:12,studio:'Studio A',status:'Tamamlandı'},b={...anime(22),genres:['Aksiyon'],rating:7,episodes:24,studio:'Studio B',status:'Yayında',airing:true},c={...anime(23),genres:['Fantastik'],rating:null,episodes:null,studio:'Studio A',status:'Henüz başlamadı'};
+ const ui=setup({loadSeason:async()=>response([a,b,c])});await flush();const app=ui.window.animeTakvimi;
+ app.setAdvancedFilters({genres:['Aksiyon','Fantastik'],minRating:8,minEpisodes:10,maxEpisodes:13,studio:'Studio A',status:'finished'});assert.equal(countCards(ui.nodes.get('card-grid').innerHTML),1);assert.ok(ui.nodes.get('card-grid').innerHTML.includes('Anime 21'));
+ app.setAdvancedFilters({genres:['Aksiyon','Fantastik'],mode:'any'});assert.equal(countCards(ui.nodes.get('card-grid').innerHTML),3);
+ app.setAdvancedFilters({minRating:9});assert.equal(countCards(ui.nodes.get('card-grid').innerHTML),0);assert.match(ui.nodes.get('empty-state').innerHTML,/Filtreleri temizle/);
+ app.clearCatalogFilters();assert.equal(countCards(ui.nodes.get('card-grid').innerHTML),3);assert.equal(app.getCatalogContext().filters.minRating,0);
+ app.setAdvancedFilters({status:'upcoming'});assert.equal(countCards(ui.nodes.get('card-grid').innerHTML),1);assert.ok(ui.nodes.get('card-grid').innerHTML.includes('Anime 23'));
 });
 
 test('native catalog posters try the same-origin proxy before a matched alternative',async()=>{

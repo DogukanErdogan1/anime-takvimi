@@ -8,11 +8,15 @@ export type Anime = {
   season?: string | null; airedFrom?: string | null; broadcastSource?: string | null;
 };
 export type Collection = {id: string; title: string; animeIds: string[]};
+export type Activity = {id:string;animeId:string;title:string;at:number;from:number;to:number};
+export type HomeWidget='continue'|'recommendations'|'today'|'history';
+export type HomeLayout={order:HomeWidget[];hidden:HomeWidget[];weeklyGoal:number};
 export type Library = {
   saved: string[]; reminders: string[]; progress: Record<string, number>;
   view: 'grid' | 'list'; savedAnime: Record<string, Anime>;
   tracking: Record<string, WatchStatus>; scores: Record<string, number>;
   favorites: string[]; collections: Collection[];
+  activity?:Activity[]; homeLayout?:HomeLayout;
 };
 export type Account = {
   authenticated: boolean; registered: boolean;
@@ -23,9 +27,9 @@ export type ExperienceSnapshot = {
   library: Library; account: Account | null; accountScope: string | null;
   loading: boolean; error: string | null; libraryLoading: boolean; blocked: boolean;
 };
-export type LibraryChange = (patch: Partial<Library> | ((current: Library) => Partial<Library>)) => void;
+export type LibraryChange = (patch: Partial<Library> | ((current: Library) => Partial<Library>),options?:{recordActivity?:boolean}) => void;
 export type Snapshot = ExperienceSnapshot;
-export type AnimeDetails = {trailerUrl: string|null; relations: {id:number;title:string;url:string}[]};
+export type AnimeDetails = {trailerUrl: string|null; relations: {id:number;title:string;url:string;relation?:string}[]};
 declare global {
   interface Window {
     AnimeExperienceMounted?: boolean;
@@ -33,11 +37,16 @@ declare global {
       getState: () => {page:string; accountScope:string|null; [key:string]: unknown};
       getLibrarySnapshot: () => Library;
       getExperienceSnapshot: () => Omit<ExperienceSnapshot,'ready'|'account'|'libraryLoading'|'blocked'>;
-      replaceLibrarySnapshot: (value: Library, options?: {emit?:boolean}) => void;
+      replaceLibrarySnapshot: (value: Library, options?: {emit?:boolean;recordActivity?:boolean}) => void;
       registerItems: (items: Anime[]) => void;
       openDetail: (id:string) => void;
       navigate: (page:string) => void;
       loadSchedule: () => Promise<void>;
+      getAnime: (id:string) => Anime|undefined;
+      undoLibraryChange: () => boolean;
+      setAdvancedFilters: (value:Record<string,unknown>) => void;
+      clearCatalogFilters: () => void;
+      getCatalogContext: () => {filters:{genres:string[];mode:string;minRating:number;minEpisodes:number;maxEpisodes:number;studio:string;status:string};genres:string[];studios:string[]};
     };
     AnimeMembership?: {
       getAccount: () => Account|null;

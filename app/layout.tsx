@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../components/experience/enhancements.css";
+import "../components/experience/discovery-tools.css";
 import "../public/site/schedule-map.css";
 import "../public/site/season-library.css";
 import "../components/experience/experience.css";

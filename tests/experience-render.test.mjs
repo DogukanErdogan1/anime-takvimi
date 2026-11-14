@@ -26,8 +26,12 @@ const profileSource=readFileSync(new URL('../components/experience/detail-profil
   .replace("from './model'",`from './experience-render-model-${process.pid}.mjs'`)
   .replace("from './watch-status-select'",`from './experience-render-watch-status-select-${process.pid}.mjs'`);
 compile('detail-profile',profileSource);
+compile('library-widgets',readFileSync(new URL('../components/experience/library-widgets.tsx',import.meta.url),'utf8').replace("from '../../lib/library-insights.mjs'",`from '${new URL('../lib/library-insights.mjs',import.meta.url).href}'`));
+compile('discovery-tools',readFileSync(new URL('../components/experience/discovery-tools.tsx',import.meta.url),'utf8').replace("from '../../lib/calendar-export.mjs'",`from '${new URL('../lib/calendar-export.mjs',import.meta.url).href}'`).replace("from './detail-profile'",`from './experience-render-detail-profile-${process.pid}.mjs'`));
 const experienceSource=readFileSync(new URL('../components/experience/experience.tsx',import.meta.url),'utf8');
 const source=experienceSource
+  .replace("from './library-widgets'",`from './experience-render-library-widgets-${process.pid}.mjs'`)
+  .replace("from './discovery-tools'",`from './experience-render-discovery-tools-${process.pid}.mjs'`)
   .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')
   .replace("from './detail-profile'",`from './experience-render-detail-profile-${process.pid}.mjs'`)
   .replace(/import \{ExperienceControls\} from '\.\/notifications';/,'const ExperienceControls=()=>null;')
@@ -60,6 +64,12 @@ test('empty guest home shows honest empty guidance without invented user or broa
   assert.match(html,/Bu sezon için henüz öneri bulunamadı/);
   assert.doesNotMatch(html,/Hoş geldin,|Deniz|Bugünkü yayınların|exp-continue-card|<img/);
   assert.doesNotMatch(html,/exp-status-tabs|exp-home-library|İzleme durumun/);
+});
+
+test('home obeys saved widget order and hidden sections without losing access to the layout editor',()=>{
+ const homeLayout={order:['history','recommendations','today','continue'],hidden:['continue','today'],weeklyGoal:0};
+ const html=render(PersonalHome,snapshot({library:library({homeLayout})}));assert.match(html,/Ana sayfamı düzenle/);assert.doesNotMatch(html,/class="exp-cinema/);assert.doesNotMatch(html,/class="exp-today/);assert.ok(html.indexOf('widget-history')<html.indexOf('widget-recommendations'));assert.match(html,/Eski ilerlemelerin için geçmiş tarih oluşturulmaz/);
+ const hidden=render(PersonalHome,snapshot({library:library({homeLayout:{...homeLayout,hidden:['continue','today','recommendations','history']}})}));assert.match(hidden,/Bölümleri geri getir/);
 });
 
 test('guest catalogue home renders API media and permits local save without inventing personal activity',()=>{

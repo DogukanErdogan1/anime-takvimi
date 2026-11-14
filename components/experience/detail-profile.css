@@ -291,7 +291,7 @@ html[data-theme=dark] :is(.at-detail,.at-profile) .at-error{color:#ffb0a4}html[d
 @media(max-width:420px) {
   .at-reviews-heading { flex-wrap:wrap; }
   .at-review-count { margin-top:0; }
-  .at-review-counter { flex-basis:100%; margin-left:50px; margin-top:-5px; }
+  .at-review-counter { flex-basis:calc(100% - 50px); margin-left:50px; margin-top:-5px; }
   .at-review-author { display:grid; grid-template-columns:40px minmax(0,1fr); gap:9px; }
   .at-review-author > .at-review-actions { grid-column:2; flex-wrap:wrap; }
   .at-review-author .at-review-avatar { align-self:start; }

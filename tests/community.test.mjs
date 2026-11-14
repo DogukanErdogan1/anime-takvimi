@@ -33,6 +33,12 @@ class SQLiteD1 {
 const caller = userId => ({userId, email: `${userId}@example.test`});
 const alice = caller('alice'); const bob = caller('bob'); const owner = caller('owner');
 const library = () => ({saved:['mal-1'],reminders:['mal-1'],progress:{'mal-1':4},view:'grid',savedAnime:{'mal-1':{id:'mal-1',title:'Anime'}},tracking:{'mal-1':'watching'},scores:{'mal-1':9},favorites:['mal-1'],collections:[{id:'favorites',title:'Favorilerim',animeIds:['mal-1']}]});
+
+test('public profiles never disclose private viewing timestamps, goals or dashboard preferences',async t=>{
+ const {service,membership}=await fixture(t);
+ await membership.putLibrary(alice,{library:{...library(),activity:[{id:'private-event',animeId:'mal-1',title:'Private event',at:123456789,from:0,to:4}],homeLayout:{order:['history','continue','recommendations','today'],hidden:['today'],weeklyGoal:7}}});
+ await service.putProfile(alice,{bio:'',isPublic:true});const result=await service.getPublicProfile('alice');assert.equal(result.library.activity,undefined);assert.equal(result.library.homeLayout,undefined);assert.ok(!JSON.stringify(result).includes('private-event'));
+});
 async function fixture(t) {
   const db = new SQLiteD1(); t.after(() => db.sqlite.close()); let time = '2026-10-17T10:00:00.000Z';
   const membership = createMembershipService(db, {adminEmail:owner.email,now:()=>time});

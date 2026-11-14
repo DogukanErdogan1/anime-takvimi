@@ -18,7 +18,8 @@
   const state = {
     page: 'discover', format: 'TV', genre: 'all', sort: 'popular', query: '',
     view: 'grid', limit: 5, hero: 0, quarter: 3, year: 2026, libraryYear: 2026, seasonsOpen: false,
-    saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], dialogId: null,
+    saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], activity:[],homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0},dialogId: null,
+    advanced:{genres:[],mode:'all',minRating:0,minEpisodes:0,maxEpisodes:0,studio:'',status:'all'},
     catalog: [], catalogKey: null, catalogMeta: null, catalogLoading: false, catalogError: null, catalogProgress: '',
     schedule: [], scheduleMeta: null, scheduleLoading: false, scheduleError: null,
     day: 0, todayDay: 0, week: [], todayKey: '', weekOffset: 0, mapSaved: false, mapQuery: '', mapFocusNow: false, mapPastOpen: false
@@ -30,6 +31,7 @@
   let storageAvailable = true;
   let toastTimer;
   let heroImageRequest = 0;
+  let libraryBaseline=null,undoEntry=null;
   const seasonPreviews = new Map();
   let libraryPreviewController = null;
   let libraryPreviewYear = null;
@@ -129,6 +131,7 @@
   function installLibrary(stored) {
       state.saved = new Set(); state.reminders = new Set(); state.progress = {}; state.view = 'grid';
       state.tracking = {}; state.scores = {}; state.favorites = []; state.collections = [];
+      state.activity=[];state.homeLayout={order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0};
       if (!stored || typeof stored !== 'object') return;
       const validId = id => typeof id === 'string' && /^mal-[1-9]\d*$/.test(id);
       if (Array.isArray(stored.saved)) state.saved = new Set(stored.saved.filter(validId));
@@ -150,6 +153,8 @@
         if (!byId.has(id)) { const item = normalize({ id }); if (item) byId.set(id, item); }
       });
       if (['grid', 'list'].includes(stored.view)) state.view = stored.view;
+      if(Array.isArray(stored.activity))state.activity=stored.activity.filter(e=>e&&typeof e.id==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(e.id)&&validId(e.animeId)&&typeof e.title==='string'&&Number.isSafeInteger(e.at)&&e.at>=0&&[e.from,e.to].every(n=>Number.isInteger(n)&&n>=0&&n<=9999)&&e.from!==e.to).slice(0,500).map(e=>({id:e.id,animeId:e.animeId,title:e.title.replace(/[\x00-\x1f]/g,'').slice(0,500),at:e.at,from:e.from,to:e.to}));
+      if(stored.homeLayout){const ids=['continue','recommendations','today','history'],order=Array.isArray(stored.homeLayout.order)?[...new Set(stored.homeLayout.order.filter(id=>ids.includes(id)))]:[];state.homeLayout={order:[...order,...ids.filter(id=>!order.includes(id))],hidden:Array.isArray(stored.homeLayout.hidden)?[...new Set(stored.homeLayout.hidden.filter(id=>ids.includes(id)))]:[],weeklyGoal:Number.isInteger(stored.homeLayout.weeklyGoal)?Math.max(0,Math.min(300,stored.homeLayout.weeklyGoal)):0};}
   }
 
   function restore() {
@@ -163,10 +168,19 @@
     new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress), ...state.favorites, ...Object.keys(state.tracking), ...Object.keys(state.scores), ...state.collections.flatMap(list => list.animeIds)]).forEach(id => {
       if (byId.has(id)) savedAnime[id] = byId.get(id);
     });
-    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime, tracking:state.tracking, scores:state.scores, favorites:state.favorites, collections:state.collections }));
+    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime, tracking:state.tracking, scores:state.scores, favorites:state.favorites, collections:state.collections,activity:state.activity,homeLayout:state.homeLayout }));
   }
 
-  function persist(emit = true) {
+  function persist(emit = true,{recordActivity=true,undo=true,preserveUndo=false}={}) {
+    const before=libraryBaseline;
+    if(emit&&recordActivity&&before){
+      const added=[];
+      for(const id of new Set([...Object.keys(before.progress),...Object.keys(state.progress)])){
+        const from=before.progress[id]||0,to=state.progress[id]||0;
+        if(from!==to&&byId.has(id)&&Object.hasOwn(state.progress,id))added.push({id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12),animeId:id,title:byId.get(id).title.replace(/[\x00-\x1f]/g,'').slice(0,500),at:Date.now(),from,to});
+      }
+      state.activity=[...added,...state.activity].slice(0,500);
+    }
     const snapshot = getLibrarySnapshot();
     try {
       localStorage.setItem(storageKey, JSON.stringify(snapshot));
@@ -174,11 +188,25 @@
       storageAvailable = false;
       toast('Tarayıcı depolaması kullanılamıyor; değişikliklerin bu oturumda korunacak.');
     }
+    if(emit&&undo&&before&&JSON.stringify(before)!==JSON.stringify(snapshot)){undoEntry={scope:accountScope,before,after:JSON.stringify(snapshot),expires:Date.now()+10000};window.dispatchEvent(new CustomEvent('anime:undoavailable',{detail:{available:true,expires:undoEntry.expires}}));}
+    else if(!emit){
+      // A catalogue refresh changes source metadata, not the user's last edit.
+      const dataKey=value=>JSON.stringify({...value,savedAnime:null});
+      if(preserveUndo&&undoEntry&&undoEntry.scope===accountScope&&Date.now()<=undoEntry.expires&&dataKey(snapshot)===dataKey(JSON.parse(undoEntry.after)))undoEntry.after=JSON.stringify(snapshot);
+      else {undoEntry=null;window.dispatchEvent(new CustomEvent('anime:undoavailable',{detail:{available:false}}));}
+    }
+    libraryBaseline=snapshot;
     if (emit) window.dispatchEvent(new CustomEvent('anime:librarychange', { detail: snapshot }));
   }
 
-  function replaceLibrarySnapshot(library, { emit = false } = {}) {
-    installLibrary(library); persist(emit); updateGenres(); refresh();
+  function replaceLibrarySnapshot(library, { emit = false,recordActivity=true } = {}) {
+    installLibrary(library); persist(emit,{recordActivity}); updateGenres(); refresh();
+  }
+  function undoLibraryChange(){
+    const entry=undoEntry,status=window.AnimeMembership?.getStatus?.();undoEntry=null;
+    window.dispatchEvent(new CustomEvent('anime:undoavailable',{detail:{available:false}}));
+    if(!entry||entry.scope!==accountScope||Date.now()>entry.expires||status?.blocked||status?.libraryLoading||status?.registered&&status.scopeUserId!==accountScope||JSON.stringify(getLibrarySnapshot())!==entry.after)return false;
+    installLibrary({...entry.before,savedAnime:Object.fromEntries(Object.entries(entry.before.savedAnime).map(([id,item])=>[id,byId.get(id)||item]))});persist(true,{recordActivity:false,undo:false});updateGenres();refresh();return true;
   }
 
   function setAccountScope(userId, library) {
@@ -188,11 +216,12 @@
     if (library !== undefined) installLibrary(library);
     if (library !== undefined) persist(false);
     updateGenres(); refresh();
+    libraryBaseline=getLibrarySnapshot();undoEntry=null;
   }
 
   function setGuestScope() {
     accountScope = null; storageKey = storageBase;
-    installLibrary(null); restore(); updateGenres(); refresh();
+    installLibrary(null); restore();libraryBaseline=getLibrarySnapshot();undoEntry=null;updateGenres(); refresh();
   }
 
   function toast(message) {
@@ -237,8 +266,17 @@
   function matches(item, respectFormat = true) {
     const query = fold(state.query.trim());
     const haystack = fold([item.title, item.original, item.studio, ...item.synonyms, ...item.genres].join(' '));
-    return (!query || haystack.includes(query)) && (!respectFormat || state.format === 'all' || state.format === item.format) && (state.genre === 'all' || item.genres.includes(state.genre));
+    const f=state.advanced;
+    const genreMatch=!f.genres.length||(f.mode==='any'?f.genres.some(g=>item.genres.includes(g)):f.genres.every(g=>item.genres.includes(g)));
+    const status=fold(item.status),finished=/finished|tamamland|bitti/.test(status),upcoming=/not yet|henüz|planlan|yakında/.test(status);
+    return (!query || haystack.includes(query)) && (!respectFormat || state.format === 'all' || state.format === item.format) && (state.genre === 'all' || item.genres.includes(state.genre))&&genreMatch&&(!f.minRating||item.rating!==null&&item.rating>=f.minRating)&&(!f.minEpisodes||item.episodes!==null&&item.episodes>=f.minEpisodes)&&(!f.maxEpisodes||item.episodes!==null&&item.episodes<=f.maxEpisodes)&&(!f.studio||item.studio.split(',').some(s=>s.trim()===f.studio))&&(f.status==='all'||f.status==='airing'&&item.airing||f.status==='finished'&&finished||f.status==='upcoming'&&upcoming);
   }
+  function setAdvancedFilters(value={}){
+    const num=(v,max)=>Math.max(0,Math.min(max,Number(v)||0));
+    state.advanced={genres:Array.isArray(value.genres)?[...new Set(value.genres.filter(g=>typeof g==='string'&&g.length<=100))].slice(0,8):[],mode:value.mode==='any'?'any':'all',minRating:num(value.minRating,10),minEpisodes:Math.floor(num(value.minEpisodes,9999)),maxEpisodes:Math.floor(num(value.maxEpisodes,9999)),studio:typeof value.studio==='string'?value.studio.slice(0,150):'',status:['airing','finished','upcoming'].includes(value.status)?value.status:'all'};
+    state.limit=Infinity;renderCatalog();window.dispatchEvent(new CustomEvent('anime:filterschange'));
+  }
+  function getCatalogContext(){return {filters:JSON.parse(JSON.stringify(state.advanced)),genres:[...new Set(state.catalog.flatMap(a=>a.genres))].sort((a,b)=>a.localeCompare(b,'tr')),studios:[...new Set(state.catalog.flatMap(a=>a.studio.split(',').map(s=>s.trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'tr'))};}
 
   function sorted(items) {
     const copy = [...items];
@@ -277,7 +315,7 @@
     const progress = countProgress(item);
     const complete = item.episodes !== null && progress >= item.episodes;
     const day = item.day === null ? item.format : days[item.day];
-    return `<article class="anime-card${watchlist ? ' watchlist-card' : ''}"><button class="card-art art remote-art" type="button" data-action="detail" data-id="${item.id}" aria-label="${escape(item.title)} detaylarını gör">${poster(item)}</button><div class="card-body"><div class="card-meta"><h3 class="card-title"><button type="button" class="title-button" data-action="detail" data-id="${item.id}">${escape(item.title)}</button></h3><span class="card-rating" title="MyAnimeList puanı">${icon('star')}<strong>${scoreText(item)}</strong></span></div><div class="card-genres">${item.genres.length ? `<span class="genre-chip">${escape(item.genres.slice(0, 2).join(' · '))}</span>` : `<span class="genre-chip">${escape(item.format)}</span>`}</div>${watchlist ? `<div class="watchlist-progress"><span>${progressText(item)}</span>${progressBar(item)}<button type="button" class="progress-inline" data-action="progress" data-id="${item.id}" data-delta="1"${complete || progress >= 9999 ? ' disabled' : ''}>${icon(complete ? 'check' : 'plus')}${complete ? 'Tamamlandı' : 'Bölüm izledim'}</button></div>` : ''}<div class="card-bottom"><span>${escape(day)} · ${totalText(item)}</span>${bookmarkButton(item)}</div></div></article>`;
+    return `<article class="anime-card${watchlist ? ' watchlist-card' : ''}"><button class="card-art art remote-art" type="button" data-action="detail" data-id="${item.id}" aria-label="${escape(item.title)} detaylarını gör">${poster(item)}</button><div class="card-body"><div class="card-meta"><h3 class="card-title"><button type="button" class="title-button" data-action="detail" data-id="${item.id}">${escape(item.title)}</button></h3><span class="card-rating" title="MyAnimeList puanı">${icon('star')}<strong>${scoreText(item)}</strong></span></div><div class="card-genres">${item.genres.length ? `<span class="genre-chip">${escape(item.genres.slice(0, 2).join(' · '))}</span>` : `<span class="genre-chip">${escape(item.format)}</span>`}</div>${watchlist ? `<div class="watchlist-progress"><span>${progressText(item)}</span>${progressBar(item)}<button type="button" class="progress-inline" data-action="progress" data-id="${item.id}" data-delta="1"${complete || progress >= 9999 ? ' disabled' : ''}>${icon(complete ? 'check' : 'plus')}${complete ? 'Tamamlandı' : 'Bölüm izledim'}</button></div>` : ''}<div class="card-bottom"><span>${escape(day)} · ${totalText(item)}</span>${bookmarkButton(item)}<button type="button" class="feature-native-compare" data-compare-id="${item.id}" aria-label="${escape(item.title)} karşılaştırmaya ekle">Karşılaştır</button></div></div></article>`;
   }
 
   function skeletons() {
@@ -349,7 +387,7 @@
     if (state.page === 'schedule') { empty.hidden = true; return; }
     empty.hidden = count > 0 || loading || Boolean(error);
     if (empty.hidden) return;
-    const hasFilters = Boolean(state.query.trim()) || state.genre !== 'all' || state.format !== 'all';
+    const f=state.advanced,hasFilters = Boolean(state.query.trim()) || state.genre !== 'all' || state.format !== 'all'||f.genres.length||f.minRating||f.minEpisodes||f.maxEpisodes||f.studio||f.status!=='all';
     const emptyList = state.page === 'watchlist' && state.saved.size === 0;
     const title = emptyList ? 'Listen henüz boş' : hasFilters ? 'Sonuç bulunamadı' : state.page === 'schedule' ? 'Saat bilgisi bulunan yayın yok' : 'Bu sezon için anime bulunamadı';
     const text = emptyList ? 'Keşfet sayfasındaki + düğmesiyle animeleri kendi listene ekle.' : state.page === 'schedule' ? 'Yayın saati açıklanmayan animeler takvimde gösterilmez.' : hasFilters ? 'Başka bir başlık dene veya filtreleri temizle.' : 'Başka bir sezon seçebilir veya verileri yenileyebilirsin.';
@@ -540,7 +578,7 @@
       state.catalog = register(result?.anime); state.catalogKey = key;
       state.catalogMeta = { fetchedAt: Number(result?.fetchedAt) || Date.now(), stale: result?.stale === true };
       state.catalogError = null; updateGenres();
-      if (state.saved.size || state.reminders.size || Object.keys(state.progress).length) persist(false);
+      if (state.saved.size || state.reminders.size || Object.keys(state.progress).length) persist(false,{preserveUndo:true});
     } catch (error) {
       if (sequence !== seasonRequest || key !== selectedKey() || error?.name === 'AbortError') return;
       state.catalogError = true;
@@ -563,7 +601,7 @@
       state.scheduleMeta = { fetchedAt: Number(result?.fetchedAt) || Date.now(), stale: result?.stale === true };
       state.scheduleError = null;
       if (state.page === 'schedule') updateGenres();
-      if (state.saved.size || state.reminders.size || Object.keys(state.progress).length) persist(false);
+      if (state.saved.size || state.reminders.size || Object.keys(state.progress).length) persist(false,{preserveUndo:true});
     } catch (error) {
       if (sequence !== scheduleRequest || error?.name === 'AbortError') return;
       state.scheduleError = true;
@@ -623,6 +661,7 @@
     if (page === 'discover' && (!state.catalogMeta || state.catalogKey !== selectedKey()) && !state.catalogLoading) loadSeason();
   }
   function clearFilters() {
+    state.advanced={genres:[],mode:'all',minRating:0,minEpisodes:0,maxEpisodes:0,studio:'',status:'all'};window.dispatchEvent(new CustomEvent('anime:filterschange'));
     state.query = ''; state.genre = 'all'; state.format = 'all'; state.limit = Infinity;
     if ($('#search')) $('#search').value = ''; if ($('#genre')) $('#genre').value = 'all'; renderPage();
   }
@@ -641,7 +680,7 @@
   }
 
   function init() {
-    restore(); updateDates();
+    restore();libraryBaseline=getLibrarySnapshot();updateDates();
     if ($('#hero')) $('#hero').hidden = true;
     if ($('#genre')) $('#genre').addEventListener('change', event => { state.genre = event.target.value; state.limit = Infinity; renderCatalog(); });
     if ($('#sort')) {
@@ -774,6 +813,7 @@
     window.animeTakvimi = {
       getState: () => ({ page: state.page, season: selectedKey(), saved: [...state.saved], reminders: [...state.reminders], progress: { ...state.progress }, view: state.view, catalogCount: state.catalog.length, scheduleCount: state.schedule.length, libraryYear: state.libraryYear, seasonsOpen: state.seasonsOpen, format: state.format, accountScope }),
       getLibrarySnapshot, setAccountScope, setGuestScope, replaceLibrarySnapshot, refreshView: refresh,
+      undoLibraryChange,setAdvancedFilters,getCatalogContext,clearCatalogFilters:clearFilters,getAnime:id=>byId.get(id),
       registerItems: register, openDetail, navigate:changePage, loadSchedule,
       getExperienceSnapshot: () => ({page:state.page, accountScope, library:getLibrarySnapshot(), catalog:state.catalog.slice(), schedule:state.schedule.slice(), loading:state.catalogLoading, error:state.catalogError})
     };

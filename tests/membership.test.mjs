@@ -100,6 +100,14 @@ CREATE INDEX audit_created_idx ON admin_audit(created_at);`;
 const identity = (userId, email = `${userId}@example.test`) => ({ userId, email, displayName: userId });
 const adminIdentity = identity('owner-identity', 'admin@example.test');
 
+test('older client saves preserve private activity and home preferences already stored for that member',async t=>{
+ const {service}=fixture(t);const user=identity('insight-owner');await service.register(user,{displayName:'Insight owner'});
+ const extra={activity:[{id:'one',animeId:'mal-1',title:'Private anime',at:Date.parse('2026-11-14T12:00:00Z'),from:0,to:2}],homeLayout:{order:['history','continue','recommendations','today'],hidden:['today'],weeklyGoal:5}};
+ await service.putLibrary(user,{library:{...library(),...extra}});
+ await service.putLibrary(user,{library:library()});const result=await service.getLibrary(user);assert.deepEqual(result.library.activity,extra.activity);assert.deepEqual(result.library.homeLayout,extra.homeLayout);
+ const other=identity('insight-other');await service.register(other,{displayName:'Other member'});assert.equal((await service.getLibrary(other)).library.activity,undefined);
+});
+
 function fixture(t, options = {}) {
   const db = new SQLiteD1(SCHEMA);
   t.after(() => db.close());

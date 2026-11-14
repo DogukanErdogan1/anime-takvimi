@@ -1,5 +1,15 @@
 # Anime Takvimi
 
+## Keşif ve kişisel araçlar
+
+- Katalogdaki **Gelişmiş filtreler** ile sekize kadar türü birlikte veya alternatif olarak seçebilir; minimum MAL puanı, bölüm aralığı, stüdyo ve yayın durumuyla sonuçları daraltabilirsin. Bilinmeyen puan/bölüm değerleri sayısal sınır seçildiğinde sonuçlara girmez.
+- Kartlardaki **Karşılaştır** ile en fazla üç animeyi puan, tür, format, bölüm, süre, stüdyo ve yayın durumuna göre yan yana inceleyebilirsin. Karşılaştırma geçicidir ve hesap değişiminde temizlenir.
+- Son liste değişikliği on saniye boyunca **Geri al** ile geri alınabilir. Hesap, izin veya liste durumu değişmişse eski bir işlem yeni verilerin üzerine yazamaz.
+- **Listem → İzleme geçmişi** ve ana sayfadaki özet, bundan sonraki bölüm değişikliklerini Türkiye saatine göre gösterir. Eski ilerlemelere tarih uydurulmaz; son 500 işlem saklanır. Haftalık hedef isteğe bağlıdır. Geçmiş, hedef ve ana sayfa tercihleri herkese açık profillere eklenmez.
+- **Ana sayfamı düzenle** ile devam etme, öneriler, bugünkü yayınlar ve izleme özeti bölümlerini sıralayabilir veya gizleyebilirsin. Tercihler ve geçmiş mevcut liste JSON'u içinde hesapla birlikte kaydedilir; misafirde tarayıcıda kalır. Bu ek alanlar için SQL migration gerekmez.
+- Anime ayrıntılarındaki seri haritası, API'nin verdiği doğrudan öncül/devam/yan hikâye bağlantılarını gösterir. Bilinmeyen ilişki türü veya veri, kronolojik izleme sırası olarak tahmin edilmez.
+- **Yayın Takvimi → Takvimime aktar**, takip edilen ve doğrulanmış yayın saatleri bulunan animelerin önümüzdeki yedi günlük planını RFC 5545 biçiminde `.ics` dosyasına aktarır. Bir takvim hesabına otomatik bağlanmaz; dosya bir anlık plandır, sonradan değişen saatler kendiliğinden eşitlenmez.
+
 Türkçe anime keşif sitesi. Sezon kataloğu MyAnimeList/Tenrai, yatay ana sayfa görselleri AniList üzerinden alınır. Next/React arayüzü Vinext ve Cloudflare Workers kullanır. E-posta/şifre hesapları, oturumlar ve kişisel listeler D1'de; profil fotoğrafları ve yönetici banner yüklemeleri R2'de saklanır.
 
 Bu sürüm yerel geliştirme içindir; bu değişiklikler canlı bir adrese yayımlanmamıştır.

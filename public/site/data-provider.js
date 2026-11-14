@@ -296,7 +296,7 @@
     const relations = [], ids = new Set();
     for (const group of (Array.isArray(raw.relations) ? raw.relations : [])) for (const entry of (Array.isArray(group?.entry) ? group.entry : [])) {
       if (entry?.type !== 'anime' || !Number.isInteger(entry.mal_id) || entry.mal_id < 1 || entry.mal_id > 2147483647 || ids.has(entry.mal_id)) continue;
-      ids.add(entry.mal_id); relations.push({id:entry.mal_id,title:text(entry.name,500) || `MyAnimeList #${entry.mal_id}`,url:`https://myanimelist.net/anime/${entry.mal_id}`});
+      ids.add(entry.mal_id); relations.push({id:entry.mal_id,title:text(entry.name,500) || `MyAnimeList #${entry.mal_id}`,url:`https://myanimelist.net/anime/${entry.mal_id}`,...(text(group.relation,80)?{relation:text(group.relation,80)}:{})});
       if (relations.length >= 20) break;
     }
     const data = {trailerUrl,relations:relations.slice(0,20)};

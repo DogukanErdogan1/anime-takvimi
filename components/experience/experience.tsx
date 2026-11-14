@@ -6,13 +6,15 @@ import {ArrowRight,Bell,Bookmark,Check,ChevronRight,Compass,Heart,Plus,Search,St
 import {AnimeDetail,ProfileView,ProfileLibraryEditor,AnimePoster} from './detail-profile';
 import {ExperienceControls} from './notifications';
 import LibraryTransfer from './library-transfer';
+import {HomeControls,ActivityPanel} from './library-widgets';
+import DiscoveryTools from './discovery-tools';
 import './enhancements.css';
 import CatalogFilters from './catalog-filters';
 import ThemePicker from './theme-picker';
 import AccountAvatarFrames from './account-avatar-frames';
 import {advanceEpisode,recommendations,searchSuggestions,statuses,watchStatus} from './model';
 import {todayFollowed} from './reminder-logic';
-import type {Anime,ExperienceSnapshot,Library,LibraryChange,WatchStatus} from './types';
+import type {Anime,ExperienceSnapshot,Library,LibraryChange,WatchStatus,HomeLayout} from './types';
 import './experience.css';
 import './detail-profile.css';
 
@@ -55,8 +57,9 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
   const today=todayFollowed([...snapshot.schedule,...snapshot.catalog,...Object.values(snapshot.library.savedAnime)],[...snapshot.library.saved,...snapshot.library.reminders],new Date()).slice(0,2);
   const name=snapshot.account?.user?.displayName;
   useEffect(()=>{if(saved.length||snapshot.library.reminders.length)window.animeTakvimi?.loadSchedule();},[snapshot.accountScope,saved.length,snapshot.library.reminders.length]);
-  return <section className="exp-home" aria-label="Sana özel anime dünyası">
-    <div className={'exp-cinema'+(bannerReady?' has-banner':'')}>
+  const layout:HomeLayout=snapshot.library.homeLayout||{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0};
+  const blocks={
+    continue:(<div className={'exp-cinema'+(bannerReady?' has-banner':'')}>
       {hero?.image&&<img className="exp-cinema-art exp-cinema-poster" src={hero.image} alt="" referrerPolicy="no-referrer" decoding="async"/>}
       {banner&&<img key={banner} className={'exp-cinema-art exp-cinema-banner'+(bannerReady?' is-loaded':'')} src={banner} alt="" referrerPolicy="no-referrer" decoding="async" fetchPriority="high" onLoad={()=>setLoadedBanner(banner)} onError={event=>{event.currentTarget.hidden=true;}}/>}
       <div className="exp-cinema-shade"/>
@@ -72,21 +75,24 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
           </div>
         </div>:<div className="exp-hero-loading" role="status">{snapshot.loading?'Sezonun hikâyeleri yükleniyor…':'Yeni hikâyeleri keşfetmek için sezon kütüphanesini aç.'}<a href="#seasons">Sezonları keşfet <ArrowRight size={16}/></a></div>}
       </div>
-      {(today.length>0||snapshot.account?.authenticated)&&<aside className="exp-today"><div><h2>Bugünkü yayınların</h2><a href="#schedule">Tümünü gör <ArrowRight size={12}/></a></div>{today.length?today.map(item=><div className="exp-today-row" key={item.id}><button className="exp-today-link" onClick={()=>onDetail(item)}><Poster item={item}/><span><strong>{item.title}</strong><small>Haftalık plana göre · {item.time}</small></span></button><button className={'exp-today-bell'+(snapshot.library.reminders.includes(item.id)?' is-active':'')} aria-label={snapshot.library.reminders.includes(item.id)?'Yayın hatırlatmasını kaldır':'Yayın hatırlatmasını seç'} aria-pressed={snapshot.library.reminders.includes(item.id)} disabled={snapshot.blocked||snapshot.libraryLoading} onClick={()=>onChange(current=>({reminders:current.reminders.includes(item.id)?current.reminders.filter(id=>id!==item.id):[...current.reminders,item.id],savedAnime:{...current.savedAnime,[item.id]:item}}))}><Bell size={17}/></button></div>):<div className="exp-today-empty"><Bell size={20}/><p>Bugün için takip ettiğin bir yayın yok.</p><a href="#schedule">Yayın takvimine göz at <ArrowRight size={13}/></a></div>}</aside>}
-    </div>
-    <div className="exp-personal-strip">
+
+    </div>),
+    recommendations:(<div className="exp-personal-strip">
       <div className="exp-discovery-layout">
         <div className="exp-discovery-copy">
           <div className="exp-recommendation-title"><small>{saved.length?'SANA ÖZEL ÖNERİLER':'SEZONDAN SEÇTİKLERİMİZ'}</small><h2>Bir sonraki<br/>{' '}favorin<span>.</span></h2><p>{saved.length?'Sevdiğin hikâyelerden yola çıktık.':'Listeni oluştur, sana uygun hikâyeleri birlikte bulalım.'}</p></div>
         </div>
-        <div className="exp-recommendation-area"><div className="exp-recommendation-posters">{picks.length?picks.map(({item,reason})=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{item.rating!==null&&<span className="exp-score"><Star size={12}/>{item.rating.toFixed(1)}</span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><p>{reason?reason+' sevdiğin için':item.genres.slice(0,3).join(' · ')||item.format}</p></article>):<p className="exp-muted">{snapshot.loading?'Öneriler hazırlanıyor…':snapshot.error||'Bu sezon için henüz öneri bulunamadı.'}</p>}</div>{suggestions.length>4&&<button className="exp-recommendation-next" aria-label="Sonraki anime önerileri" onClick={()=>setOffset(start+4>=suggestions.length?0:start+4)}><ChevronRight size={19}/></button>}</div>
+        <div className="exp-recommendation-area"><div className="exp-recommendation-posters">{picks.length?picks.map(({item,reason})=><article key={item.id}><button className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{item.rating!==null&&<span className="exp-score"><Star size={12}/>{item.rating.toFixed(1)}</span>}</button><button className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button><p>{reason?reason+' sevdiğin için':item.genres.slice(0,3).join(' · ')||item.format}</p><button type="button" className="feature-link" data-compare-id={item.id}>Karşılaştır</button></article>):<p className="exp-muted">{snapshot.loading?'Öneriler hazırlanıyor…':snapshot.error||'Bu sezon için henüz öneri bulunamadı.'}</p>}</div>{suggestions.length>4&&<button className="exp-recommendation-next" aria-label="Sonraki anime önerileri" onClick={()=>setOffset(start+4>=suggestions.length?0:start+4)}><ChevronRight size={19}/></button>}</div>
       </div>
-    </div>
-  </section>;
+    </div>),
+    today:((today.length>0||snapshot.account?.authenticated)&&<aside className="exp-today"><div><h2>Bugünkü yayınların</h2><a href="#schedule">Tümünü gör <ArrowRight size={12}/></a></div>{today.length?today.map(item=><div className="exp-today-row" key={item.id}><button className="exp-today-link" onClick={()=>onDetail(item)}><Poster item={item}/><span><strong>{item.title}</strong><small>Haftalık plana göre · {item.time}</small></span></button><button className={'exp-today-bell'+(snapshot.library.reminders.includes(item.id)?' is-active':'')} aria-label={snapshot.library.reminders.includes(item.id)?'Yayın hatırlatmasını kaldır':'Yayın hatırlatmasını seç'} aria-pressed={snapshot.library.reminders.includes(item.id)} disabled={snapshot.blocked||snapshot.libraryLoading} onClick={()=>onChange(current=>({reminders:current.reminders.includes(item.id)?current.reminders.filter(id=>id!==item.id):[...current.reminders,item.id],savedAnime:{...current.savedAnime,[item.id]:item}}))}><Bell size={17}/></button></div>):<div className="exp-today-empty"><Bell size={20}/><p>Bugün için takip ettiğin bir yayın yok.</p><a href="#schedule">Yayın takvimine göz at <ArrowRight size={13}/></a></div>}</aside>),
+    history:<ActivityPanel library={snapshot.library} onChange={onChange} compact disabled={snapshot.blocked||snapshot.libraryLoading}/>,
+  };
+  return <section className="exp-home" aria-label="Sana özel anime dünyası"><HomeControls library={snapshot.library} onChange={onChange} disabled={snapshot.blocked||snapshot.libraryLoading}/>{layout.order.filter(id=>!layout.hidden.includes(id)).map(id=><div className={'feature-home-widget widget-'+id} key={id}>{blocks[id as keyof typeof blocks]}</div>)}{layout.hidden.length===4&&<div className="feature-empty"><h2>Panonun tüm bölümleri gizli.</h2><p>Ana sayfamı düzenle menüsünden göstermek istediğin bölümleri seç.</p><button className="feature-button" onClick={()=>onChange({homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:layout.weeklyGoal}})}>Bölümleri geri getir</button></div>}</section>;
 }
 
 export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
-  const [tab,setTab]=useState<WatchStatus|'all'|'favorites'>('all');
+  const [tab,setTab]=useState<WatchStatus|'all'|'favorites'|'activity'>('all');
   const library=snapshot.library;
   const saved=library.saved.map(id=>library.savedAnime[id]).filter(Boolean);
   const favorites=saved.filter(item=>library.favorites.includes(item.id));
@@ -98,16 +104,18 @@ export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnaps
       <button type="button" className={tab==='all'?'active':''} aria-pressed={tab==='all'} onClick={()=>setTab('all')}>Tümü <span>{saved.length}</span></button>
       {statuses.map(status=><button type="button" key={status.id} className={tab===status.id?'active':''} aria-pressed={tab===status.id} onClick={()=>setTab(status.id)}>{status.label}</button>)}
       <button type="button" className={tab==='favorites'?'active':''} aria-pressed={tab==='favorites'} onClick={()=>setTab('favorites')}><Heart size={13} aria-hidden="true"/> Favoriler <span>{favorites.length}</span></button>
+      <button type="button" className={tab==='activity'?'active':''} aria-pressed={tab==='activity'} onClick={()=>setTab('activity')}>İzleme geçmişi</button>
+      <button type="button" data-compare-open>Karşılaştır</button>
       <a href="#profile">Profilim <ArrowRight size={14}/></a>
     </div>
-    {snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:items.length?<div className="exp-library-grid">
+    {snapshot.libraryLoading?<p role="status">Hesap listen yükleniyor…</p>:tab==='activity'?<ActivityPanel library={library} onChange={onChange} disabled={!editable} onShowLibrary={()=>setTab('all')}/>:items.length?<div className="exp-library-grid">
       {items.map(item=><article key={item.id} aria-label={item.title}>
         <button type="button" className="exp-pick-cover" onClick={()=>onDetail(item)}><Poster item={item}/>{library.favorites.includes(item.id)&&<span className="exp-favorite-badge" aria-label="Favori"><Heart size={17} fill="currentColor" aria-hidden="true"/></span>}</button>
         <button type="button" className="exp-title-link" onClick={()=>onDetail(item)}>{item.title}</button>
         <div className="exp-library-summary"><span>{statuses.find(status=>status.id===watchStatus(item,library))!.label}</span><small>{library.progress[item.id]||0} / {item.episodes||'?'} bölüm</small></div>
-        <ProfileLibraryEditor item={item} library={library} canEdit={editable} onChange={onChange}/>
+        <ProfileLibraryEditor item={item} library={library} canEdit={editable} onChange={onChange}/><button type="button" className="feature-link" data-compare-id={item.id}>Karşılaştırmaya ekle</button>
       </article>)}
-    </div>:<div className="exp-empty"><Bookmark size={34}/><h2>{tab==='favorites'?'Favorilerin burada birikecek.':'Burada yeni hikâyelere yer var.'}</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':tab==='favorites'?'Listendeki kalbe dokunarak sevdiğin animeleri buraya ekleyebilirsin.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a></div>}
+    </div>:<div className="exp-empty"><Bookmark size={34}/><h2>{tab==='favorites'?'Favorilerin burada birikecek.':'Burada yeni hikâyelere yer var.'}</h2><p>{tab==='all'?'Keşfederken sevdiğin animeleri listene ekle.':tab==='favorites'?'Listendeki kalbe dokunarak sevdiğin animeleri buraya ekleyebilirsin.':'Bu durumda henüz bir anime yok.'}</p><a href="#discover" className="exp-primary">Anime keşfet <Compass size={16}/></a>{saved.length>0&&<button className="feature-button" type="button" onClick={()=>setTab('all')}>Tüm listemi göster</button>}</div>}
   </section>;
 }
 function NavigationSearch({rail,snapshot,onDetail}:{rail:HTMLElement|null;snapshot:ExperienceSnapshot;onDetail:(item:Anime)=>void}){
@@ -290,18 +298,18 @@ export default function AnimeExperience({initialAnime}:{initialAnime?:Anime}={})
   useNavigationEffects(page,snapshot.ready);
   useEffect(()=>{const dismiss=()=>setDetail(null);window.addEventListener('hashchange',dismiss);return()=>window.removeEventListener('hashchange',dismiss);},[]);
   const closeDetail=()=>{if(initialAnime){window.location.assign('/#discover');return;}setDetail(null);requestAnimationFrame(()=>{window.scrollTo({top:previousScroll.current});if(previousFocus.current?.isConnected)previousFocus.current.focus({preventScroll:true});else document.getElementById('main')?.focus({preventScroll:true});});};
-  useEffect(()=>{if(!detail)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('dialog[open]'))closeDetail();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[detail]);
+  useEffect(()=>{if(!detail)return;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('dialog[open],[role=dialog][data-state=open]'))closeDetail();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[detail]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(timer);},[notice]);
-  const change=useCallback<LibraryChange>((patch)=>{
+  const change=useCallback<LibraryChange>((patch,options)=>{
     const current=readSnapshot();
     if(!current.ready||current.libraryLoading||current.blocked||current.account?.registered&&current.account.user?.id!==current.accountScope){setNotice('Hesap listen hazır olduğunda düzenleyebilirsin.');return;}
-    window.animeTakvimi?.replaceLibrarySnapshot({...current.library,...(typeof patch==='function'?patch(current.library):patch)},{emit:true});
+    window.animeTakvimi?.replaceLibrarySnapshot({...current.library,...(typeof patch==='function'?patch(current.library):patch)},{emit:true,recordActivity:options?.recordActivity!==false});
   },[]);
   const openDetail=(item:Anime)=>{window.animeTakvimi?.registerItems([item]);previousFocus.current=document.activeElement as HTMLElement;previousScroll.current=window.scrollY;setDetail(item);window.scrollTo({top:0});};
   let publicUserId:string|undefined;
   if(hash.startsWith('profile=')){try{publicUserId=decodeURIComponent(hash.slice(8));}catch{publicUserId=hash.slice(8);}}
   return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
-    {snapshot.ready&&<CatalogFilters page={page}/>}
+    {snapshot.ready&&<><CatalogFilters page={page}/><DiscoveryTools snapshot={snapshot} onDetail={openDetail}/></>}
     <AccountAvatarFrames ready={snapshot.ready} frameId={snapshot.account?.user?.avatarFrame}/>
     {notice&&<div className="exp-feedback" role="status">{notice}</div>}
   </>;

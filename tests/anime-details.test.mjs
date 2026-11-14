@@ -47,10 +47,10 @@ test('relations accept distinct bounded numeric anime IDs, sanitize labels and i
   const entries = [{type:'anime',mal_id:22,name:'<b>Previous season</b>',url:'javascript:alert(1)'},{type:'anime',mal_id:22,name:'Duplicate'},...invalid,{type:'anime',mal_id:23,name:''},{type:'anime',mal_id:24,name:'x'.repeat(501)}];
   const ui = setup(async()=>response(payload(1,{relations:[{relation:'Prequel',entry:entries},{relation:'Sequel',entry:[{type:'anime',mal_id:25,name:'Sequel',url:'https://untrusted.test/'}]}]})));
   assert.deepEqual(plain((await ui.api.getDetails(1)).relations),[
-    {id:22,title:'Previous season',url:'https://myanimelist.net/anime/22'},
-    {id:23,title:'MyAnimeList #23',url:'https://myanimelist.net/anime/23'},
-    {id:24,title:'x'.repeat(500),url:'https://myanimelist.net/anime/24'},
-    {id:25,title:'Sequel',url:'https://myanimelist.net/anime/25'},
+    {id:22,title:'Previous season',url:'https://myanimelist.net/anime/22',relation:'Prequel'},
+    {id:23,title:'MyAnimeList #23',url:'https://myanimelist.net/anime/23',relation:'Prequel'},
+    {id:24,title:'x'.repeat(500),url:'https://myanimelist.net/anime/24',relation:'Prequel'},
+    {id:25,title:'Sequel',url:'https://myanimelist.net/anime/25',relation:'Sequel'},
   ]);
   const many = setup(async()=>response(payload(1,{relations:[{entry:Array.from({length:50},(_,index)=>({type:'anime',mal_id:index+1,name:'Related'}))}]})));
   assert.equal((await many.api.getDetails(1)).relations.length,20);
