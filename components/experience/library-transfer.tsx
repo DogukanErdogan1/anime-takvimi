@@ -1,6 +1,6 @@
 'use client';
 import {useRef,useState} from 'react';
-import {Download,Upload,Check,X,ChevronDown,FileSpreadsheet,SlidersHorizontal} from 'lucide-react';
+import {Download,Upload,Check,X,ChevronDown,FileSpreadsheet,SlidersHorizontal,Link} from 'lucide-react';
 import {DropdownMenu} from 'radix-ui';
 import type {Library,LibraryChange} from './types';
 import {exportLibrary,parseLibraryJson,fromMalEntries,mergeLibraries,libraryCsv} from '../../lib/library-transfer.mjs';
@@ -21,13 +21,13 @@ export default function LibraryTransfer({library,onChange,disabled=false,compact
   {compact?<DropdownMenu.Root modal={false}>
    <DropdownMenu.Trigger className="at-transfer-trigger"><SlidersHorizontal size={15} aria-hidden="true"/><span>Liste işlemleri</span><ChevronDown size={14} aria-hidden="true"/></DropdownMenu.Trigger>
    <DropdownMenu.Portal><DropdownMenu.Content className="at-transfer-menu" align="end" sideOffset={8} collisionPadding={12} aria-label="Liste işlemleri">
-    <DropdownMenu.Label className="at-transfer-menu-label">Listeni taşı ve yedekle</DropdownMenu.Label>
+    <DropdownMenu.Label className="at-transfer-menu-label">Listeni taşı ve yedekle</DropdownMenu.Label><DropdownMenu.Item className="at-transfer-menu-item" onSelect={()=>window.dispatchEvent(new CustomEvent('anime:connections'))}><Link size={17} aria-hidden="true"/><span>Bağlantılar ve çevrimdışı<small>Çevrimdışı kopya · AniList</small></span></DropdownMenu.Item><DropdownMenu.Separator className="at-transfer-menu-separator"/>
     <DropdownMenu.Item className="at-transfer-menu-item" onSelect={()=>download()}><Download size={17} aria-hidden="true"/><span>JSON yedeği<small>Listeni ve ilerlemeni kaydet</small></span></DropdownMenu.Item>
     <DropdownMenu.Item className="at-transfer-menu-item" onSelect={()=>download(true)}><FileSpreadsheet size={17} aria-hidden="true"/><span>CSV indir<small>Tablo olarak dışa aktar</small></span></DropdownMenu.Item>
     <DropdownMenu.Separator className="at-transfer-menu-separator"/>
     <DropdownMenu.Item className="at-transfer-menu-item" disabled={disabled||reading} onSelect={()=>input.current?.click()}><Upload size={17} aria-hidden="true"/><span>{reading?'Okunuyor…':'İçe aktar'}<small>JSON veya MyAnimeList XML</small></span></DropdownMenu.Item>
    </DropdownMenu.Content></DropdownMenu.Portal>
-  </DropdownMenu.Root>:<><div><strong>Listen her zaman yanında</strong><p>JSON yedeğini veya MyAnimeList XML dosyanı içe aktar. Mevcut ilerleme ve puanların korunur.</p></div><div className="at-transfer-actions"><button type="button" className="at-outline-button" onClick={()=>download()}><Download size={15}/>JSON yedeği</button><button type="button" className="at-text-button" onClick={()=>download(true)}>CSV indir</button><button type="button" className="at-primary-button" disabled={disabled||reading} onClick={()=>input.current?.click()}><Upload size={15}/>{reading?'Okunuyor…':'İçe aktar'}</button></div></>}
+  </DropdownMenu.Root>:<><div><strong>Listen her zaman yanında</strong><p>JSON yedeğini veya MyAnimeList XML dosyanı içe aktar. Mevcut ilerleme ve puanların korunur.</p></div><div className="at-transfer-actions"><button type="button" className="at-outline-button" onClick={()=>window.dispatchEvent(new CustomEvent('anime:connections'))}><Link size={15}/>Bağlantılar ve çevrimdışı</button><button type="button" className="at-outline-button" onClick={()=>download()}><Download size={15}/>JSON yedeği</button><button type="button" className="at-text-button" onClick={()=>download(true)}>CSV indir</button><button type="button" className="at-primary-button" disabled={disabled||reading} onClick={()=>input.current?.click()}><Upload size={15}/>{reading?'Okunuyor…':'İçe aktar'}</button></div></>}
   <input ref={input} type="file" accept=".json,.xml,application/json,text/xml" hidden aria-label="Liste dosyası seç" onChange={event=>{const file=event.target.files?.[0];if(file)void read(file);}}/>
   {draft&&<div className="at-transfer-preview" role="status"><p><strong>{draft.saved.length} anime</strong> okundu. Yeni kayıtlar mevcut listene eklenecek; aynı animedeki mevcut ayarların korunacak.</p><button type="button" className="at-primary-button" disabled={disabled} onClick={()=>{try{const merged=mergeLibraries(library,draft) as Library;onChange(merged,{recordActivity:false});setDraft(null);setNotice('Liste birleştirildi.');}catch{setError('Birleştirme sınırı aşıldı. Listede en fazla 500 anime bulunabilir.');}}}><Check size={15}/>Listeme ekle</button><button type="button" className="at-text-button" onClick={()=>setDraft(null)}><X size={15}/>Vazgeç</button></div>}{error&&<p className="at-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  </section>;

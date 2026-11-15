@@ -6,7 +6,7 @@
   const icon = name => typeof window.icon === 'function' ? window.icon(name) : '';
   const copy = value => JSON.parse(JSON.stringify(value));
   const state = {
-    account: null, accountLoading: true, libraryLoading: false, scopeUserId: null, actor: 0,
+    account: null, accountLoading: true, offline: false, libraryLoading: false, scopeUserId: null, actor: 0,
     pending: null, version: 0, savedVersion: 0, saving: false, blocked: false,
     notice: 'Hesap bilgileri yükleniyor…', noticeKind: 'loading', retryAction: null,
     adminOpen: false, adminDenied: false, adminLoading: false, adminPage: 1, adminPages: 1,
@@ -73,6 +73,8 @@
     if (error?.status === 413) return 'Liste sunucunun boyut sınırını aşıyor. Kayıt sayısını azaltıp yeniden deneyebilirsin.';
     if (error?.status === 429) return 'Çok fazla istek gönderildi. Biraz sonra yeniden deneyebilirsin.';
     if (error?.status === 400) return 'Gönderilen bilgiler kabul edilmedi. Bilgilerini kontrol edip yeniden dene.';
+    if(error?.status===409&&error.code==='account_changed')return 'Hesap değişti. Aynı hesabına yeniden giriş yaparak eşitle.';
+    if(error?.status===409&&error.code==='library_conflict')return 'Listen başka bir yerde değişti. Eşitleme seçimini kontrol et.';
     if (error?.status === 409) return 'Bu üyelik zaten mevcut. Hesap bilgilerini yeniden yükleyebilirsin.';
     if (error?.code === 'SERVER_REQUIRED') return 'Giriş ve üyelik için siteyi sunucu üzerinden açman gerekiyor.';
     return 'Sunucu bağlantısı kurulamadı. Yeniden deneyebilirsin.';
@@ -113,6 +115,7 @@
 
   function expireSession(error) {
     if (error?.status !== 401) return false;
+    window.AnimeOffline?.lock().catch(()=>{});
     state.actor++; state.account = null; state.scopeUserId = null; state.accountLoading = false;
     state.pending = null; state.libraryLoading = false; state.blocked = false;
     clearTimeout(debounceTimer); state.adminDenied = true;
@@ -124,7 +127,7 @@
 
   function blockOnForbidden(error) {
     if (error?.status !== 403) return false;
-    state.blocked = true; renderAccount();
+    state.blocked = true; window.AnimeOffline?.lock().catch(()=>{}); renderAccount();
     setNotice(errorText(error), 'error', 'reload-account');
     return true;
   }
@@ -142,7 +145,8 @@
 
   async function loadAccount() {
     if (filePreview()) {
-      state.actor++; state.account = null; state.accountLoading = false; state.scopeUserId = null;
+      window.AnimeOffline?.lock().catch(()=>{});
+    state.actor++; state.account = null; state.accountLoading = false; state.scopeUserId = null;
       window.animeTakvimi?.setGuestScope(); renderAccount();
       setNotice('Dosya önizlemesi: giriş, üyelik ve profil fotoğrafı için siteyi sunucu üzerinden açman gerekiyor.', 'info', 'setup');
       return;
@@ -153,24 +157,30 @@
       const account = await api('/api/account');
       if (actor !== state.actor) return;
       if (account.registered && (!account.authenticated || !account.user || typeof account.user.id !== 'string' || !['admin', 'member'].includes(account.user.role) || !['active', 'suspended'].includes(account.user.status))) throw new ApiError(502, 'INVALID_ACCOUNT');
-      state.account = account; state.blocked = false; state.adminDenied = false;
+      state.account = account; state.offline=false; state.blocked = false; state.adminDenied = false;
       renderAccount();
       state.pending = null; state.version = 0; state.savedVersion = 0; clearTimeout(debounceTimer);
+      const offline=await window.AnimeOfflineReady;
       if (registered()) {
+        await offline?.activate(account.user.id).catch(()=>{});
         state.scopeUserId = account.user.id;
         window.animeTakvimi?.setAccountScope(account.user.id);
         if (account.user.status === 'suspended') {
-          state.blocked = true;
+          state.blocked = true; await offline?.lock().catch(()=>{});
           setNotice('Üyeliğin askıya alınmış. Hesap listende değişiklik yapamazsın.', 'error');
         } else await loadLibrary(actor);
       } else {
-        state.scopeUserId = null; window.animeTakvimi?.setGuestScope();
+        await offline?.lock().catch(()=>{}); state.scopeUserId = null; window.animeTakvimi?.setGuestScope();
         setNotice(account.authenticated ? 'Üyeliğini tamamlayabilirsin. Misafir listen bu cihazda ayrı tutulur.' : 'Misafir listen yalnızca bu cihazda saklanır.');
       }
     } catch (error) {
       if (actor !== state.actor) return;
-      state.account = null; state.scopeUserId = null; window.animeTakvimi?.setGuestScope();
-      setNotice('Hesap bağlantısı kurulamadı; liste bu cihazda misafir olarak saklanıyor.', 'error', 'reload-account');
+      const offline=await window.AnimeOfflineReady, cached=await offline?.resume().catch(()=>null);
+      if(cached&&(globalThis.navigator?.onLine===false||!error?.status)){
+        state.account={authenticated:true,registered:true,user:{id:cached.scope,displayName:cached.alias,role:'member',status:'active'}};state.scopeUserId=cached.scope;state.offline=true;state.blocked=false;
+        window.animeTakvimi?.setAccountScope(cached.scope);window.animeTakvimi?.replaceLibrarySnapshot(cached.library,{emit:false,recordActivity:false});
+        setNotice('Çevrimdışı kopyan açık. Değişiklikler bağlantı gelince aynı hesabınla eşitlenecek.','info','retry-library');
+      }else{await offline?.lock().catch(()=>{});state.account = null; state.scopeUserId = null; window.animeTakvimi?.setGuestScope();setNotice('Hesap bağlantısı kurulamadı; liste bu cihazda misafir olarak saklanıyor.', 'error', 'reload-account');}
     } finally {
       if (actor === state.actor) {
         state.accountLoading = false; renderAccount();
@@ -187,22 +197,29 @@
       const result = await api('/api/library');
       if (actor !== state.actor || userId !== state.scopeUserId) return;
       if (!result.library || typeof result.library !== 'object') throw new ApiError(502, 'INVALID_LIBRARY');
-      window.animeTakvimi?.replaceLibrarySnapshot(result.library, { emit: false });
+      const offline=await window.AnimeOfflineReady, loaded=await offline?.load(userId,result.library).catch(()=>null);
+      if(actor!==state.actor||userId!==state.scopeUserId)return;
+      window.animeTakvimi?.replaceLibrarySnapshot(loaded?.library||result.library, { emit: false,recordActivity:false });
+      if(loaded?.kind==='conflict')setNotice('Çevrimdışı değişikliklerle hesap listesi çakışıyor. Liste işlemlerinden eşitleme seçimini yap.','error','open-connections');
       state.pending = null; state.savedVersion = state.version;
-      setNotice('Hesap listen yüklendi. Değişiklikler hesabına kaydedilir.', 'success');
+      if(loaded?.kind!=='conflict')setNotice('Hesap listen yüklendi. Değişiklikler hesabına kaydedilir.', 'success');
     } catch (error) {
       if (actor !== state.actor || userId !== state.scopeUserId) return;
       if (!expireSession(error) && !blockOnForbidden(error)) setNotice('Hesap listesi alınamadı. Yalnızca bu hesaba ait cihaz önbelleği gösteriliyor.', 'error', 'retry-library');
     } finally { if (actor === state.actor) { state.libraryLoading = false; window.dispatchEvent(new CustomEvent('anime:accountchange')); } }
   }
 
-  function libraryChanged(event) {
+  async function libraryChanged(event) {
     if (!activeMember()) {
       if (!registered()) setNotice(filePreview() ? 'Misafir listen bu cihazda saklandı. Giriş ve üyelik için sunucu bağlantısı gerekiyor.' : 'Misafir listen bu cihazda saklandı.', 'info', filePreview() ? 'setup' : null);
       return;
     }
     if (state.libraryLoading || !event.detail || typeof event.detail !== 'object') return;
     state.pending = copy(event.detail); state.version++;
+    const scope=state.scopeUserId,version=state.version,offline=await window.AnimeOfflineReady;
+    try{await offline?.capture(scope,event.detail);}catch{setNotice('Çevrimdışı depolama dolu veya kullanılamıyor. Bu sekmeyi kapatmadan bağlantıyı yeniden dene.','error','retry-library');}
+    if(scope!==state.scopeUserId||version!==state.version)return;
+    if(globalThis.navigator?.onLine===false){setNotice('Değişiklikler cihazda saklandı. Bağlantı gelince aynı hesabınla eşitlenecek.','info','retry-library');return;}
     setNotice('Cihazda saklandı; hesaba kaydediliyor…', 'loading');
     clearTimeout(debounceTimer); debounceTimer = setTimeout(flushLibrary, 700);
   }
@@ -214,14 +231,23 @@
     let failed = false;
     setNotice('Hesaba kaydediliyor…', 'loading');
     try {
-      const result = await api('/api/library', { method: 'PUT', body: JSON.stringify({ library: snapshot }) });
+      const offline=await window.AnimeOfflineReady,status=await offline?.status(userId).catch(()=>null);
+      let result;
+      if(status?.enabled){
+        const outcome=await offline.sync(userId);
+        if(outcome.kind==='conflict'){failed=true;setNotice('İki cihazdaki değişiklikler çakışıyor. Liste işlemlerinden hangisini koruyacağını seç.','error','open-connections');return;}
+        if(outcome.kind==='disabled'){failed=true;await loadAccount();return;}
+        if(outcome.kind!=='synced'){failed=true;setNotice('Değişiklikler cihazda saklandı; bağlantı geldiğinde tekrar eşitlenecek.','info','retry-library');return;}
+        result={library:outcome.library};
+      }else result=await api('/api/library', { method: 'PUT',headers:{'X-Library-Account':userId}, body: JSON.stringify({ library: snapshot }) });
       if (actor !== state.actor || userId !== state.scopeUserId) return;
       if (!result.library || typeof result.library !== 'object') throw new ApiError(502, 'INVALID_LIBRARY');
       state.savedVersion = version;
-      if (state.version === version) { state.pending = null; setNotice('Hesaba kaydedildi.', 'success'); }
+      if (state.version === version) { state.pending = null;window.animeTakvimi?.replaceLibrarySnapshot(result.library,{emit:false,recordActivity:false,preserveUndo:true}); setNotice('Hesaba kaydedildi.', 'success'); }
     } catch (error) {
       if (actor !== state.actor || userId !== state.scopeUserId) return;
       failed = true;
+      if(error?.code==='account_changed'){await loadAccount();setNotice('Hesap değişti. Çevrimdışı değişiklikler aynı hesabın için korunuyor.','info');return;}
       if (!expireSession(error) && !blockOnForbidden(error)) setNotice(`Cihazda saklandı; hesaba kaydedilemedi. ${errorText(error)}`, 'error', 'retry-library');
     } finally {
       state.saving = false;
@@ -431,7 +457,7 @@
   function init() {
     window.AnimeMembership = {
       openProfile, openSettings, closeAdmin, getAccount: () => state.account ? copy(state.account) : null, isAdminOpen: () => state.adminOpen,
-      getStatus: () => ({ authenticated: state.account?.authenticated === true, registered: registered(), role: registered() ? state.account.user.role : null, scopeUserId: state.scopeUserId, saving: state.saving, pending: Boolean(state.pending), libraryLoading:state.libraryLoading, blocked:state.blocked })
+      getStatus: () => ({ authenticated: state.account?.authenticated === true, registered: registered(), role: registered() ? state.account.user.role : null, scopeUserId: state.scopeUserId, saving: state.saving, pending: Boolean(state.pending), libraryLoading:state.libraryLoading, blocked:state.blocked,offline:state.offline||globalThis.navigator?.onLine===false })
     };
     if ($('#membership-close')) $('#membership-close').addEventListener('click', closeDialog);
     if ($('#membership-dialog')) $('#membership-dialog').addEventListener('click', event => {
@@ -452,6 +478,9 @@
       clearTimeout(searchTimer); searchTimer = setTimeout(loadMembers, 300);
     });
     window.addEventListener('anime:librarychange', libraryChanged);
+    window.addEventListener('anime:offlinesynced',event=>{if(event.detail?.scope===state.scopeUserId&&!state.pending&&!state.saving){window.animeTakvimi?.replaceLibrarySnapshot(event.detail.library,{emit:false,recordActivity:false});setNotice('Çevrimdışı değişikliklerin hesabınla eşitlendi.','success');}});
+    window.addEventListener('online',()=>{if(state.offline)loadAccount();else if(state.pending)flushLibrary();});
+    window.addEventListener('offline',()=>{if(activeMember())setNotice('Çevrimdışısın. Hazırladığın kütüphane bu cihazda kullanılabilir.','info','open-connections');});
     window.addEventListener('anime:avatarframechange', event => {
       const value = event.detail;
       if (!activeMember() || value?.userId !== state.account.user.id || typeof value.frameId !== 'string' || !/^[a-z-]{1,32}$/.test(value.frameId)) return;
@@ -471,6 +500,7 @@
     document.addEventListener('click', event => {
       const button = event.target.closest?.('[data-member-action]'); if (!button || button.disabled) return;
       switch (button.dataset.memberAction) {
+        case 'open-connections': window.dispatchEvent(new CustomEvent('anime:connections'));break;
         case 'setup': openSetup(); break;
         case 'close-dialog': closeDialog(); break;
         case 'register': openRegistration(); break;

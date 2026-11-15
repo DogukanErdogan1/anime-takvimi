@@ -30,6 +30,8 @@ compile('library-widgets',readFileSync(new URL('../components/experience/library
 compile('discovery-tools',readFileSync(new URL('../components/experience/discovery-tools.tsx',import.meta.url),'utf8').replace("from '../../lib/calendar-export.mjs'",`from '${new URL('../lib/calendar-export.mjs',import.meta.url).href}'`).replace("from './detail-profile'",`from './experience-render-detail-profile-${process.pid}.mjs'`));
 const experienceSource=readFileSync(new URL('../components/experience/experience.tsx',import.meta.url),'utf8');
 const source=experienceSource
+  .replace(/import LibraryConnections from '\.\/library-connections';/, 'const LibraryConnections=()=>null;')
+  .replace(/import LeisureTools from '\.\/leisure-tools';/, 'const LeisureTools=()=>null;')
   .replace("from './library-widgets'",`from './experience-render-library-widgets-${process.pid}.mjs'`)
   .replace("from './discovery-tools'",`from './experience-render-discovery-tools-${process.pid}.mjs'`)
   .replace(/import LibraryTransfer from '\.\/library-transfer';/, 'const LibraryTransfer=()=>null;')

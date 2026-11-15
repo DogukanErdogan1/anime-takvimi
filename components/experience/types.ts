@@ -32,12 +32,14 @@ export type Snapshot = ExperienceSnapshot;
 export type AnimeDetails = {trailerUrl: string|null; relations: {id:number;title:string;url:string;relation?:string}[]};
 declare global {
   interface Window {
+    AnimeOfflineReady?:Promise<OfflineClient|null>;
+    AnimeOffline?:OfflineClient;
     AnimeExperienceMounted?: boolean;
     animeTakvimi?: {
       getState: () => {page:string; accountScope:string|null; [key:string]: unknown};
       getLibrarySnapshot: () => Library;
       getExperienceSnapshot: () => Omit<ExperienceSnapshot,'ready'|'account'|'libraryLoading'|'blocked'>;
-      replaceLibrarySnapshot: (value: Library, options?: {emit?:boolean;recordActivity?:boolean}) => void;
+      replaceLibrarySnapshot: (value: Library, options?: {emit?:boolean;recordActivity?:boolean;preserveUndo?:boolean}) => void;
       registerItems: (items: Anime[]) => void;
       openDetail: (id:string) => void;
       navigate: (page:string) => void;
@@ -50,7 +52,7 @@ declare global {
     };
     AnimeMembership?: {
       getAccount: () => Account|null;
-      getStatus: () => {authenticated:boolean; registered:boolean; role:string|null; scopeUserId:string|null; saving:boolean; pending:boolean; libraryLoading:boolean; blocked:boolean};
+      getStatus: () => {authenticated:boolean; registered:boolean; role:string|null; scopeUserId:string|null; saving:boolean; pending:boolean; libraryLoading:boolean; blocked:boolean;offline?:boolean};
       openProfile: () => void; openSettings: () => void; closeAdmin: () => void; isAdminOpen: () => boolean;
     };
     AnimeData?: {
@@ -61,3 +63,10 @@ declare global {
     AnimeBanners?: {resolve: (id:number) => Promise<string|null>; safeBanner: (value:unknown,id?:number) => string|null; resolvePoster: (id:number) => Promise<string|null>; safePoster: (value:unknown) => string|null};
   }
 }
+export type OfflineClient={
+ status:(scope?:string)=>Promise<{enabled:boolean;pending:boolean;scope:string|null;verifiedAt:number|null;syncing:boolean}>;
+ enable:(scope:string,alias:string,library:Library,palette?:Record<string,string>)=>Promise<void>;
+ disable:(scope:string)=>Promise<void>;
+ sync:(scope:string,choice?:'local'|'remote')=>Promise<{kind:string;conflicts?:{path:string;label:string}[];library?:Library}>;
+ load:(scope:string,library:Library)=>Promise<{kind?:string;library?:Library}>;
+};

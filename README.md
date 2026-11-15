@@ -2,6 +2,11 @@
 
 ## Keşif ve kişisel araçlar
 
+- **Listem → Liste işlemleri → Bağlantılar ve çevrimdışı** bölümünden bu cihaz için çevrimdışı kütüphane hazırlanabilir. `/offline.html`, internet olmadığında listeyi IndexedDB'den açar; ilerleme, durum, puan ve favori değişiklikleri korunur. Özel liste verileri, notlar ve geçmiş yalnızca kullanıcı erişimi açarsa cihazda saklanır. Oturum kapatılırken erişim kilitlenir; bekleyen değişiklikler aynı hesap tekrar giriş yapana kadar kendi alanında kalır. Son çevrimiçi doğrulamadan 30 gün sonra yeniden giriş gerekir. Sabit, kişisel veri içermeyen çevrimdışı HTML/JS/CSS dosyaları ve en fazla 60 herkese açık afiş dışında API yanıtları veya hesap HTML'i Service Worker önbelleğine alınmaz.
+- Yeniden bağlanınca hesap kimliği doğrulanır; üç yönlü birleştirme bağımsız değişiklikleri korur. Çakışan alanlar için cihaz/hesap sürümü seçilir. `If-Match` revizyonu ve `X-Library-Account` kontrolü eşitleme sırasında başka cihazın değişikliklerinin veya başka bir hesabın listesinin üzerine yazılmasını önler. Sekme kapansa da bekleyen değişiklikler cihazda kalır.
+- Ana sayfa, **Listem** ve kendi profilindeki **Bu akşam ne izlesem?**, süre, ruh hali, tür, format ve kişisel liste tercihiyle en fazla altı öneri hazırlar. Bilinmeyen süreler ve henüz başlamamış animeler dışarıda kalır; yayındaki seriler için bir bölüm önerilir.
+- **Birlikte izle**, davetle katılınan ortak koleksiyonlar ve kişi başına değiştirilebilir tek oy sunar. Üyeler anime ekleyebilir; ekleyen veya kurucu kaldırabilir. Yalnız kurucu davet oluşturabilir ve koleksiyonu silebilir. Davetler yedi gün geçerlidir, yenilendiğinde eski bağlantı iptal olur; sunucuda yalnız token özeti tutulur. Koleksiyon başına 20 üye/50 anime, hesap başına 20 koleksiyon sınırı vardır. E-posta, özel not, hatırlatma ve kişisel bölüm ilerlemesi paylaşılmaz. Bu özellik `0010_watch_clubs.sql` migrationını gerektirir; Railway başlangıcı bekleyen migrationları otomatik uygular.
+- **Yıl özetim**, Türkiye saatine göre tarihli bölüm değişikliklerini toplar; azaltılan ilerlemeleri düşer ve bilinen son bölüme o yıl ulaşılmış serileri sayar. Tarihsiz eski izlemeler ve bilinmeyen toplam bölüm sayıları tahmin edilmez. Son 500 kayıt sınırı belirtilir. Seçili temanın renkleri ve gerçek anime afişleriyle PNG indirilebilir; görselde kullanıcı adı, e-posta ve özel notlar yer almaz.
 - Katalogdaki **Gelişmiş filtreler** ile sekize kadar türü birlikte veya alternatif olarak seçebilir; minimum MAL puanı, bölüm aralığı, stüdyo ve yayın durumuyla sonuçları daraltabilirsin. Bilinmeyen puan/bölüm değerleri sayısal sınır seçildiğinde sonuçlara girmez.
 - Kartlardaki **Karşılaştır** ile en fazla üç animeyi puan, tür, format, bölüm, süre, stüdyo ve yayın durumuna göre yan yana inceleyebilirsin. Karşılaştırma geçicidir ve hesap değişiminde temizlenir.
 - Son liste değişikliği on saniye boyunca **Geri al** ile geri alınabilir. Hesap, izin veya liste durumu değişmişse eski bir işlem yeni verilerin üzerine yazamaz.
@@ -13,6 +18,19 @@
 Türkçe anime keşif sitesi. Sezon kataloğu MyAnimeList/Tenrai, yatay ana sayfa görselleri AniList üzerinden alınır. Next/React arayüzü Vinext ve Cloudflare Workers kullanır. E-posta/şifre hesapları, oturumlar ve kişisel listeler D1'de; profil fotoğrafları ve yönetici banner yüklemeleri R2'de saklanır.
 
 Bu sürüm yerel geliştirme içindir; bu değişiklikler canlı bir adrese yayımlanmamıştır.
+
+## AniList bağlantısını etkinleştirme
+
+Bağlantı ve seçmeli içe/dışa eşitleme kodu hazırdır. Gerçek bir hesap bağlanabilmesi için siteye ait AniList uygulaması oluşturulmalıdır. `0011_anilist.sql` migrationı uygulanır; Railway bekleyen migrationları başlangıçta otomatik uygular.
+
+1. AniList'in [geliştirici ayarlarında](https://anilist.co/settings/developer) uygulama oluştur. Önerilen ad: **Anime Takvimi**.
+2. Canlı sitede yönlendirme adresi: `https://anime-takvimi-production.up.railway.app/api/integrations/anilist/callback`. Yalnız yerelde denenecek ayrı uygulama için: `http://localhost:5173/api/integrations/anilist/callback`. Yönlendirme adresi ve port uygulama kaydıyla birebir aynı olmalı.
+3. `ANILIST_CLIENT_ID`, `ANILIST_CLIENT_SECRET`, `ANILIST_REDIRECT_URI` değerlerini sunucunun gizli ortam ayarlarına ekle; anahtarları sohbete veya Git'e koyma. Cloudflare'da ilgili secret'lar, Railway'de servis Variables kullanılır. `ANILIST_ENCRYPTION_KEY` isteğe bağlı ayrı şifreleme anahtarıdır; verilmezse sunucudaki client secret'tan türetilir. Anahtar değişirse eski bağlantıları yeniden kurmak gerekir.
+4. Kişisel Anime Takvimi hesabıyla **Bağlantılar ve çevrimdışı → AniList hesabımı bağla** akışını tamamla. Ortak demo hesabında kişisel AniList bağlantısı sunucu tarafında engellenir.
+
+OAuth durumu tek kullanımlıdır, on dakika geçerlidir ve oturum/üyeye bağlıdır. Token yalnız sunucuda, üyeye bağlı AES-GCM şifrelemesiyle tutulur; tarayıcıya gönderilmez. AniList kapsamlı OAuth izni verir, fakat uygulama yalnız anime listesindeki durum/ilerleme/puan alanlarını eşitler. Özel notlar, favoriler ve kişisel koleksiyonlar gönderilmez. Önizlemede seçilmeyen kayıtlar değişmez; mevcut kayıtlar topluca silinmez. Yeni AniList kayıtları gizli oluşturulur. İçe aktarımda ondalıklı puanlar 1–10 tam sayı ölçeğine yuvarlanır; PAUSED → İzleyeceğim, REPEATING → İzliyorum olarak gösterilir. Eski izlemelere yeni tarihli ilerleme olayı eklenmez.
+
+Önizleme yerel liste revizyonuna ve bağlı AniList hesabına sabitlenir. Aktarım öncesi AniList kaydı tekrar okunur; başka yerde değişmiş kayıtlar ezilmez. Dışa aktarım sırayla yürür, durdurulabilir ve belirsiz yanıttan sonra yeniden denendiğinde aynı sonuç tekrar yazılmaz. İstek bütçesi ve AniList `Retry-After` beklemesi korunur. Bağlantıyı kaldırmak sunucudaki token'ı ve planları siler; AniList listesini silmez. Gerçek OAuth akışı, uygulama anahtarları eklenene kadar etkin değildir.
 
 ## Localhostta açma
 

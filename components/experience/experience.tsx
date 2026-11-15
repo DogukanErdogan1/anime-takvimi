@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
+import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {Popover} from 'radix-ui';
 import {WatchStatusSelect} from './watch-status-select';
@@ -10,6 +11,8 @@ import {ExperienceControls} from './notifications';
 import LibraryTransfer from './library-transfer';
 import {HomeControls,ActivityPanel} from './library-widgets';
 import DiscoveryTools from './discovery-tools';
+import LeisureTools from './leisure-tools';
+import LibraryConnections from './library-connections';
 import './enhancements.css';
 import CatalogFilters from './catalog-filters';
 import ThemePicker from './theme-picker';
@@ -41,7 +44,7 @@ function useBanner(item:Anime|undefined){
   },[malId]);
   return resolved.malId===malId?resolved.url:null;
 }
-export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
+export function PersonalHome({snapshot,onChange,onDetail,tools}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void;tools?:ReactNode}){
   const [offset,setOffset]=useState(0);
   const saved=snapshot.library.saved.map(id=>snapshot.library.savedAnime[id]).filter(Boolean);
   const continuing=saved.filter(item=>watchStatus(item,snapshot.library)==='watching');
@@ -90,7 +93,7 @@ export function PersonalHome({snapshot,onChange,onDetail}:{snapshot:ExperienceSn
     today:((today.length>0||snapshot.account?.authenticated)&&<aside className="exp-today"><div><h2>Bugünkü yayınların</h2><a href="#schedule">Tümünü gör <ArrowRight size={12}/></a></div>{today.length?today.map(item=><div className="exp-today-row" key={item.id}><button className="exp-today-link" onClick={()=>onDetail(item)}><Poster item={item}/><span><strong>{item.title}</strong><small>Haftalık plana göre · {item.time}</small></span></button><button className={'exp-today-bell'+(snapshot.library.reminders.includes(item.id)?' is-active':'')} aria-label={snapshot.library.reminders.includes(item.id)?'Yayın hatırlatmasını kaldır':'Yayın hatırlatmasını seç'} aria-pressed={snapshot.library.reminders.includes(item.id)} disabled={snapshot.blocked||snapshot.libraryLoading} onClick={()=>onChange(current=>({reminders:current.reminders.includes(item.id)?current.reminders.filter(id=>id!==item.id):[...current.reminders,item.id],savedAnime:{...current.savedAnime,[item.id]:item}}))}><Bell size={17}/></button></div>):<div className="exp-today-empty"><Bell size={20}/><p>Bugün için takip ettiğin bir yayın yok.</p><a href="#schedule">Yayın takvimine göz at <ArrowRight size={13}/></a></div>}</aside>),
     history:<ActivityPanel library={snapshot.library} onChange={onChange} compact disabled={snapshot.blocked||snapshot.libraryLoading}/>,
   };
-  return <section className="exp-home" aria-label="Sana özel anime dünyası"><HomeControls library={snapshot.library} onChange={onChange} disabled={snapshot.blocked||snapshot.libraryLoading}/>{layout.order.filter(id=>!layout.hidden.includes(id)).map(id=><div className={'feature-home-widget widget-'+id} key={id}>{blocks[id as keyof typeof blocks]}</div>)}{layout.hidden.length===4&&<div className="feature-empty"><h2>Panonun tüm bölümleri gizli.</h2><p>Ana sayfamı düzenle menüsünden göstermek istediğin bölümleri seç.</p><button className="feature-button" onClick={()=>onChange({homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:layout.weeklyGoal}})}>Bölümleri geri getir</button></div>}</section>;
+  return <section className="exp-home" aria-label="Sana özel anime dünyası"><HomeControls tools={tools} library={snapshot.library} onChange={onChange} disabled={snapshot.blocked||snapshot.libraryLoading}/>{layout.order.filter(id=>!layout.hidden.includes(id)).map(id=><div className={'feature-home-widget widget-'+id} key={id}>{blocks[id as keyof typeof blocks]}</div>)}{layout.hidden.length===4&&<div className="feature-empty"><h2>Panonun tüm bölümleri gizli.</h2><p>Ana sayfamı düzenle menüsünden göstermek istediğin bölümleri seç.</p><button className="feature-button" onClick={()=>onChange({homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:layout.weeklyGoal}})}>Bölümleri geri getir</button></div>}</section>;
 }
 
 export function Watchlist({snapshot,onChange,onDetail}:{snapshot:ExperienceSnapshot;onChange:LibraryChange;onDetail:(i:Anime)=>void}){
@@ -318,8 +321,9 @@ export default function AnimeExperience({initialAnime}:{initialAnime?:Anime}={})
   const openDetail=(item:Anime)=>{window.animeTakvimi?.registerItems([item]);previousFocus.current=document.activeElement as HTMLElement;previousScroll.current=window.scrollY;setDetail(item);window.scrollTo({top:0});};
   let publicUserId:string|undefined;
   if(hash.startsWith('profile=')){try{publicUserId=decodeURIComponent(hash.slice(8));}catch{publicUserId=hash.slice(8);}}
-  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.home)}{page==='watchlist'&&createPortal(<Watchlist key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail}/>,slots.page)}{page==='profile'&&createPortal(<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
-    {snapshot.ready&&<><CatalogFilters page={page}/><DiscoveryTools snapshot={snapshot} onDetail={openDetail}/></>}
+  const tools=<LeisureTools key={'tools-'+(snapshot.accountScope||'guest')} snapshot={snapshot} onDetail={openDetail} compact={page==='discover'}/>;
+  return <>{slots&&snapshot.ready&&<>{page==='discover'&&createPortal(<PersonalHome key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail} tools={tools}/>,slots.home)}{page==='watchlist'&&createPortal(<>{tools}<Watchlist key={snapshot.accountScope||'guest'} snapshot={snapshot} onChange={change} onDetail={openDetail}/></>,slots.page)}{page==='profile'&&createPortal(<>{!publicUserId&&tools}<ProfileView key={hash+snapshot.accountScope} snapshot={snapshot} publicUserId={publicUserId} onClose={()=>{location.hash='discover';}} onChange={change} onOpenDetail={openDetail}/></>,slots.page)}{page==='detail'&&detail&&createPortal(<AnimeDetail key={detail.id+snapshot.accountScope} item={detail} snapshot={snapshot} onClose={closeDetail} onChange={change}/>,slots.page)}{createPortal(<ThemePicker/>,slots.menu)}{createPortal(<><NavigationSearch rail={slots.nav.closest<HTMLElement>('.rail')} snapshot={snapshot} onDetail={openDetail}/><ExperienceControls snapshot={snapshot} onChange={change}/></>,slots.nav)}</>}
+    {snapshot.ready&&<><CatalogFilters page={page}/><DiscoveryTools snapshot={snapshot} onDetail={openDetail}/><LibraryConnections key={snapshot.accountScope||'guest'} snapshot={snapshot}/></>}
     <AccountAvatarFrames ready={snapshot.ready} frameId={snapshot.account?.user?.avatarFrame}/>
     {notice&&<div className="exp-feedback" role="status">{notice}</div>}
   </>;

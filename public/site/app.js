@@ -207,8 +207,8 @@
     if (emit) window.dispatchEvent(new CustomEvent('anime:librarychange', { detail: snapshot }));
   }
 
-  function replaceLibrarySnapshot(library, { emit = false,recordActivity=true } = {}) {
-    installLibrary(library); persist(emit,{recordActivity}); updateGenres(); refresh();
+  function replaceLibrarySnapshot(library, { emit = false,recordActivity=true,preserveUndo=false } = {}) {
+    installLibrary(library); persist(emit,{recordActivity,preserveUndo}); updateGenres(); refresh();
   }
   function undoLibraryChange(){
     const entry=undoEntry,status=window.AnimeMembership?.getStatus?.();undoEntry=null;

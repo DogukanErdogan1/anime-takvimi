@@ -107,6 +107,15 @@ test('undo expires and can never cross account or permission boundaries',async()
  app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:2}},{emit:true});app.setAccountScope('other-account',base);assert.equal(app.undoLibraryChange(),false);assert.equal(app.getLibrarySnapshot().progress[item.id],undefined);
  app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),progress:{[item.id]:1}},{emit:true});ui.window.AnimeMembership={getStatus:()=>({blocked:true})};assert.equal(app.undoLibraryChange(),false);
 });
+test('acknowledging an offline sync preserves undo only when user data is unchanged',async()=>{
+ const ui=setup();await flush();const app=ui.window.animeTakvimi,item=anime(21),base={saved:[item.id],savedAnime:{[item.id]:item},reminders:[],progress:{},view:'grid',favorites:[]};
+ app.replaceLibrarySnapshot(base,{emit:false});app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),favorites:[item.id]},{emit:true});
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),savedAnime:{[item.id]:{...item,title:'Updated metadata'}}},{emit:false,recordActivity:false,preserveUndo:true});
+ assert.equal(app.undoLibraryChange(),true);assert.equal(app.getLibrarySnapshot().favorites.length,0);
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),favorites:[item.id]},{emit:true});
+ app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),scores:{[item.id]:9}},{emit:false,preserveUndo:true});
+ assert.equal(app.undoLibraryChange(),false,'an independent remote edit cannot be reverted by an old local undo');
+});
 
 test('native save and removal remain undoable when the schedule refreshes source metadata',async()=>{
  const item=anime(21),updated={...item,title:'Updated source title'};

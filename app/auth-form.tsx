@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import {createOfflineStore} from '../public/site/offline-core.mjs';
 
 export function AuthForm({mode, returnTo}: {mode: 'login' | 'register' | 'logout'; returnTo: string}) {
   const [busy, setBusy] = useState(false);
@@ -24,6 +25,7 @@ export function AuthForm({mode, returnTo}: {mode: 'login' | 'register' | 'logout
       const response = await fetch(`/api/auth/${mode}`, {method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, body: JSON.stringify(payload)});
       const data = await response.json() as {error?: {message?: string}};
       if (!response.ok) { setError(data?.error?.message || 'İşlem tamamlanamadı. Yeniden dene.'); return; }
+      await createOfflineStore().activate(null).catch(()=>{});
       form.reset();
       window.location.assign(returnTo);
     } catch { setError('Sunucuya bağlanılamadı. Bağlantını kontrol edip yeniden dene.'); }

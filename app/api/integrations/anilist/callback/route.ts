@@ -1,0 +1,4 @@
+import {anilistContext,stateCookie} from '@/lib/anilist-route';
+export const dynamic='force-dynamic';
+export async function GET(request:Request){const url=new URL(request.url);let result='connected';try{if(url.searchParams.has('error'))throw Error('declined');const {identity,service,sessionToken}=await anilistContext(request),cookie=request.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith('anime_anilist_state='))?.slice('anime_anilist_state='.length);await service.callback(identity,sessionToken,{code:url.searchParams.get('code'),state:url.searchParams.get('state'),cookie});}catch{result='failed';}
+ const target=new URL('/?anilist='+result+'#watchlist',url.origin);return new Response(null,{status:303,headers:{Location:target.href,'Set-Cookie':stateCookie(null,request.url),'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});}

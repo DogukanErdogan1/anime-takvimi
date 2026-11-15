@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const members = sqliteTable('members', {
   id: text('id').primaryKey(), email: text('email').notNull(), displayName: text('display_name').notNull(),
   role: text('role', {enum: ['admin','member']}).notNull().default('member'),
@@ -121,3 +121,29 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
 export const pushDeliveries = sqliteTable('push_deliveries', {
  endpointHash:text('endpoint_hash').notNull().references(()=>pushSubscriptions.endpointHash,{onDelete:'cascade'}),occurrence:text('occurrence').notNull(),status:text('status',{enum:['sending','sent','failed']}).notNull(),claimedAt:integer('claimed_at').notNull(),attempts:integer('attempts').notNull().default(1),
 },table=>[primaryKey({columns:[table.endpointHash,table.occurrence]})]);
+
+export const watchClubs=sqliteTable('watch_clubs',{
+ id:text('id').primaryKey(),ownerId:text('owner_id').notNull().references(()=>members.id),title:text('title').notNull(),createdAt:text('created_at').notNull(),
+},table=>[check('watch_club_title',sql`length(trim(${table.title})) BETWEEN 1 AND 80`),index('watch_clubs_owner').on(table.ownerId)]);
+export const watchClubMembers=sqliteTable('watch_club_members',{
+ clubId:text('club_id').notNull().references(()=>watchClubs.id,{onDelete:'cascade'}),userId:text('user_id').notNull().references(()=>members.id),joinedAt:text('joined_at').notNull(),
+},table=>[primaryKey({columns:[table.clubId,table.userId]}),index('watch_club_user').on(table.userId)]);
+export const watchClubEntries=sqliteTable('watch_club_entries',{
+ clubId:text('club_id').notNull().references(()=>watchClubs.id,{onDelete:'cascade'}),animeId:integer('anime_id').notNull(),animeJson:text('anime_json').notNull(),addedBy:text('added_by').notNull().references(()=>members.id),createdAt:text('created_at').notNull(),
+},table=>[primaryKey({columns:[table.clubId,table.animeId]}),check('watch_club_anime',sql`${table.animeId} BETWEEN 1 AND 2147483647`),check('watch_club_json',sql`json_valid(${table.animeJson}) AND length(${table.animeJson})<=4096`)]);
+export const watchClubVotes=sqliteTable('watch_club_votes',{
+ clubId:text('club_id').notNull(),userId:text('user_id').notNull(),animeId:integer('anime_id').notNull(),
+},table=>[primaryKey({columns:[table.clubId,table.userId]}),foreignKey({columns:[table.clubId,table.userId],foreignColumns:[watchClubMembers.clubId,watchClubMembers.userId]}).onDelete('cascade'),foreignKey({columns:[table.clubId,table.animeId],foreignColumns:[watchClubEntries.clubId,watchClubEntries.animeId]}).onDelete('cascade')]);
+export const watchClubInvites=sqliteTable('watch_club_invites',{
+ clubId:text('club_id').primaryKey().references(()=>watchClubs.id,{onDelete:'cascade'}),tokenHash:text('token_hash').notNull().unique(),expiresAt:integer('expires_at').notNull(),
+},table=>[check('watch_club_token',sql`length(${table.tokenHash})=64`)]);
+
+export const anilistConnections=sqliteTable('anilist_connections',{
+ userId:text('user_id').primaryKey().references(()=>members.id),anilistId:integer('anilist_id').notNull().unique(),displayName:text('display_name').notNull(),tokenCipher:text('token_cipher').notNull(),expiresAt:integer('expires_at').notNull(),generation:text('generation').notNull(),connectedAt:integer('connected_at').notNull(),rateReset:integer('rate_reset').notNull().default(0),rateCount:integer('rate_count').notNull().default(0),
+});
+export const anilistOauthStates=sqliteTable('anilist_oauth_states',{
+ tokenHash:text('token_hash').primaryKey(),userId:text('user_id').notNull().references(()=>members.id),sessionHash:text('session_hash').notNull().references(()=>authSessions.tokenHash,{onDelete:'cascade'}),expiresAt:integer('expires_at').notNull(),used:integer('used').notNull().default(0),
+},table=>[index('anilist_states_user').on(table.userId,table.expiresAt),check('anilist_state_used',sql`${table.used} IN (0,1)`)]);
+export const anilistSyncPlans=sqliteTable('anilist_sync_plans',{
+ id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>anilistConnections.userId,{onDelete:'cascade'}),generation:text('generation').notNull(),direction:text('direction',{enum:['import','export']}).notNull(),libraryRevision:text('library_revision').notNull(),dataJson:text('data_json').notNull(),expiresAt:integer('expires_at').notNull(),lockedUntil:integer('locked_until').notNull().default(0),lease:text('lease'),
+},table=>[index('anilist_plans_user').on(table.userId,table.expiresAt),check('anilist_plan_direction',sql`${table.direction} IN ('import','export')`),check('anilist_plan_json',sql`json_valid(${table.dataJson})`)]);
