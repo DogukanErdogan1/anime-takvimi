@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bell, Bookmark, Camera, Check, ChevronDown, CircleCheck, Clapperboard, Compass, ExternalLink, Eye, EyeOff, Heart, LayoutGrid, ListPlus, MessageCircle, Minus, Pencil, Play, Plus, Settings, Shield, Star, StarHalf, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, Bookmark, Camera, Check, ChevronDown, CircleCheck, Clapperboard, Compass, ExternalLink, Eye, EyeOff, GitBranch, Heart, LayoutGrid, ListPlus, ListTree, MessageCircle, Minus, Pencil, Play, Plus, Settings, Shield, Star, StarHalf, Trash2, X } from 'lucide-react';
 import type { Anime, Library, LibraryChange as Change, ExperienceSnapshot as Snapshot } from './types';
 import { advanceEpisode, watchStatus } from './model';
 import {WatchStatusSelect} from './watch-status-select';
@@ -16,10 +16,11 @@ const states = [
   ['watching', 'İzliyorum'], ['planned', 'İzleyeceğim'], ['completed', 'Tamamladım'], ['dropped', 'Bıraktım']
 ] as const;
 type TrackingStatus = typeof states[number][0];
-type Review = { id: string; userId: string; displayName: string; body: string; spoiler: boolean; score: number | null; createdAt: string };
+type Review = { id: string; userId: string; displayName: string; body: string; spoiler: boolean; score: number | null; createdAt: string; episode?: number | null };
 type ReviewPage = {reviews: Review[]; average: number | null; total: number};
 type Profile = { id: string; displayName: string; bio: string; isPublic: boolean; coverUrl?: string | null; avatarFrame?: string | null; createdAt?: string };
-type Details = { trailerUrl?: string | null; relations?: {id: number; title: string; url: string; relation?:string}[] };
+type SeriesRelation = {id: number; title: string; url: string; relation?: string};
+type Details = { trailerUrl?: string | null; relations?: SeriesRelation[] };
 type ExperienceWindow = Window & {
   AnimeData?: { getDetails?: (id: number, options: { signal: AbortSignal }) => Promise<Details> };
   AnimeMembership?: { openSettings?: () => void; openProfile?: () => void };
@@ -97,7 +98,7 @@ function allItems(snapshot: Snapshot, library: Library = snapshot.library): Anim
   for (const item of [...snapshot.catalog, ...snapshot.schedule, ...Object.values(library.savedAnime)]) if (item?.id) index.set(item.id, item);
   return [...new Set([...library.saved, ...Object.keys(library.tracking || {}), ...(library.favorites || []), ...(library.collections || []).flatMap(collection => collection.animeIds)])].map(id => index.get(id)).filter((item): item is Anime => Boolean(item));
 }
-export function AnimePoster({item,className='at-poster',showTitle=false,priority=false}:{item:Anime;className?:string;showTitle?:boolean;priority?:boolean}) {
+export function AnimePoster({item,className='at-poster',showTitle=false,priority=false}:{item:Pick<Anime,'malId'|'image'|'title'>;className?:string;showTitle?:boolean;priority?:boolean}) {
   const target=useRef<HTMLSpanElement>(null);
   const [visible,setVisible]=useState(()=>priority||typeof IntersectionObserver==='undefined');
   useEffect(()=>{if(visible||!target.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'240px'});observer.observe(target.current);return()=>observer.disconnect();},[visible]);
@@ -267,6 +268,93 @@ export function ProfileInsights({items,library,isOwner,onStatusSelect}:{items:An
   </div>;
 }
 
+function relationKind(value: string | undefined) {
+  return (value || '').trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
+}
+
+function relationLabel(value: string | undefined) {
+  const labels: Record<string, string> = {
+    prequel: 'Önceki seri', sequel: 'Devam serisi', 'parent story': 'Ana seri',
+    'side story': 'Yan hikâye', 'spin off': 'Yan seri', 'alternative version': 'Alternatif sürüm',
+    'alternative setting': 'Alternatif evren', summary: 'Özet', adaptation: 'Uyarlama',
+    'full story': 'Tam hikâye', character: 'Karakter bağlantısı', other: 'Diğer bağlantı',
+  };
+  return labels[relationKind(value)] || value?.trim() || 'Bağlantılı anime';
+}
+
+export function buildSeriesRoute(item: Pick<Anime, 'malId'>, relations: SeriesRelation[]) {
+  const before: SeriesRelation[] = [], after: SeriesRelation[] = [], branches: SeriesRelation[] = [];
+  const seen = new Set<number>([item.malId]);
+  for (const relation of relations) {
+    if (!Number.isSafeInteger(relation.id) || relation.id <= 0 || relation.id > 2147483647 || seen.has(relation.id)) continue;
+    const url = malUrl(relation.url);
+    if (!url || Number(new URL(url).pathname.split('/')[2]) !== relation.id) continue;
+    seen.add(relation.id);
+    const kind = relationKind(relation.relation);
+    if (kind === 'prequel' || kind === 'parent story') before.push(relation);
+    else if (kind === 'sequel') after.push(relation);
+    else branches.push(relation);
+    if (seen.size === 21) break;
+  }
+  return {before, after, branches, total: before.length + after.length + branches.length};
+}
+
+export function SeriesRoute({item, relations, snapshot}: {item: Anime; relations: SeriesRelation[]; snapshot: Snapshot}) {
+  const [expanded, setExpanded] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const route = buildSeriesRoute(item, relations);
+  const before = expanded ? route.before : route.before.slice(0, 1);
+  const after = expanded ? route.after : route.after.slice(0, 1);
+  const branches = expanded ? route.branches : route.branches.slice(0, 3);
+  const shown = before.length + after.length + branches.length;
+  const known = new Map([...snapshot.catalog, ...snapshot.schedule, ...Object.values(snapshot.library.savedAnime), item].map(anime => [anime.malId, anime]));
+  const routeId = `series-route-${item.malId}`;
+  const card = (relation?: SeriesRelation) => {
+    const current = !relation, anime = current ? item : known.get(relation.id);
+    const title = relation?.title || item.title;
+    const poster = {malId: relation?.id || item.malId, title, image: anime?.image || null};
+    const metadata = anime ? [anime.format, anime.year, anime.episodes && anime.episodes > 0 ? `${anime.episodes} bölüm` : null].filter(Boolean).join(' · ') : '';
+    const content = <><AnimePoster item={poster} className="at-poster series-route-poster"/><span className="series-route-copy"><span className="series-route-label">{current ? 'Şu an inceliyorsun' : relationLabel(relation.relation)}</span><strong>{title}</strong>{metadata && <small>{metadata}</small>}</span>{!current && <ExternalLink size={16} aria-hidden="true"/>}</>;
+    return current ? <div className="series-route-card is-current" aria-current="true">{content}</div> : <a className="series-route-card" href={malUrl(relation.url)!} target="_blank" rel="noopener noreferrer" aria-label={`${title} — ${relationLabel(relation.relation)}, MyAnimeList’te aç`}>{content}</a>;
+  };
+  const toggle = () => {
+    setExpanded(value => !value);
+    if (expanded) requestAnimationFrame(() => container.current?.closest('section')?.scrollIntoView({block: 'start', behavior: 'instant'}));
+  };
+  return <div ref={container} className="series-route">
+    <p className="series-route-context"><strong>{item.title}</strong><span aria-hidden="true">·</span><span>{route.total} bağlantı</span></p>
+    <div id={routeId} className={'series-route-layout' + (branches.length ? ' has-branches' : '')}>
+      <ol className="series-route-main" aria-label="Önceki ve devam serileri">
+        {before.map(relation => <li key={relation.id}>{card(relation)}</li>)}
+        <li key="current">{card()}</li>
+        {after.map(relation => <li key={relation.id}>{card(relation)}</li>)}
+      </ol>
+      {branches.length > 0 && <ul className="series-route-side" aria-label="Yan hikâyeler ve diğer bağlantılar">{branches.map(relation => <li key={relation.id}>{card(relation)}</li>)}</ul>}
+    </div>
+    {(shown < route.total || expanded) && <footer className="series-route-footer"><button type="button" className="feature-button" aria-controls={routeId} aria-expanded={expanded} onClick={toggle}><ListTree size={17}/>{expanded ? 'Özeti göster' : 'Tüm bağlantılar'}<ArrowRight size={16} className={expanded ? 'is-expanded' : ''}/></button><span>{shown} / {route.total} bağlantı gösteriliyor</span></footer>}
+  </div>;
+}
+
+export function EpisodeNotes({item,library,onChange,disabled=false,registered=false}:{item:Anime;library:Library;onChange:Change;disabled?:boolean;registered?:boolean}) {
+  const limit=item.episodes||9999;
+  const [episode,setEpisode]=useState(()=>String(Math.min(limit,Math.max(1,library.progress[item.id]||1))));
+  const [drafts,setDrafts]=useState<Record<string,string>>({}),[confirming,setConfirming]=useState(false),[notice,setNotice]=useState<{episode:string;body:string;message:string}|null>(null);
+  const notes=library.episodeNotes?.[item.id]||{},saved=notes[episode]||'';
+  const body=Object.hasOwn(drafts,episode)?drafts[episode]:saved;
+  const valid=/^[1-9]\d{0,3}$/.test(episode)&&Number(episode)<=limit;
+  const total=Object.values(library.episodeNotes||{}).reduce((sum,entries)=>sum+Object.keys(entries).length,0);
+  const full=total>=250&&!saved;
+  const invalidBody=/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(body);
+  const chips=[...new Set([...Object.keys(notes),...Object.keys(drafts).filter(key=>/^[1-9]\d{0,3}$/.test(key)&&drafts[key].trim())])].sort((a,b)=>Number(a)-Number(b));
+  const choose=(value:string)=>{setEpisode(value);setConfirming(false);setNotice(null);};
+  const save=(remove=false)=>{
+    if(disabled||!valid||!remove&&(!body.trim()||body.length>2000||invalidBody||full))return;
+    onChange(current=>{const episodeNotes={...current.episodeNotes},entries={...(episodeNotes[item.id]||{})};if(remove)delete entries[episode];else entries[episode]=body.trim();if(Object.keys(entries).length)episodeNotes[item.id]=entries;else delete episodeNotes[item.id];return {episodeNotes,savedAnime:{...current.savedAnime,[item.id]:item}};});
+    setDrafts(current=>{const next={...current};delete next[episode];return next;});setConfirming(false);setNotice({episode,body:remove?'':body.trim(),message:remove?'Not kaldırıldı.':'Notun saklandı.'});
+  };
+  return <details className="episode-notes"><summary><Pencil size={19} aria-hidden="true"/><strong>Bölüm notlarım</strong><span>{Object.keys(notes).length} not</span><small><Shield size={13} aria-hidden="true"/>Sadece sana özel</small><ChevronDown size={17} aria-hidden="true"/></summary><div className="episode-notes-content"><p>{registered?'Notların hesabında saklanır.':'Notların bu tarayıcıda saklanır.'} Herkese açık profilinde, yorumlarda veya liste dışa aktarımında paylaşılmaz.</p><div className="episode-note-chips" role="group" aria-label="Not alınan bölümler">{chips.map(key=><button key={key} type="button" className="feature-button" aria-pressed={episode===key} onClick={()=>choose(key)}>{key}. bölüm{Object.hasOwn(drafts,key)&&drafts[key]!==notes[key]?' · taslak':''}</button>)}</div><form onSubmit={event=>{event.preventDefault();save();}}><div className="episode-note-heading"><label>Bölüm numarası<input type="number" min="1" max={limit} step="1" value={episode} disabled={disabled} onChange={event=>choose(event.target.value)} required/></label><span>{body.length.toLocaleString('tr-TR')} / 2.000</span></div><label className="at-visually-hidden" htmlFor={'episode-note-'+item.malId}>Bölüm notun</label><textarea id={'episode-note-'+item.malId} value={body} maxLength={2000} rows={4} disabled={disabled||!valid} placeholder="Bu bölümde aklında kalanlar, düşüncelerin…" onChange={event=>{setDrafts(current=>({...current,[episode]:event.target.value}));setNotice(null);}}/>{full&&<p className="at-error" role="alert">En fazla 250 bölüm notu saklayabilirsin. Yeni not için önce bir notunu kaldır.</p>}<footer><div>{saved&&<button type="button" className="feature-link" disabled={disabled} onClick={()=>setConfirming(true)}>Bu notu kaldır</button>}</div><div><button type="button" className="feature-link" disabled={!Object.hasOwn(drafts,episode)} onClick={()=>setDrafts(current=>{const next={...current};delete next[episode];return next;})}>Taslağı sıfırla</button><button className="feature-button is-primary" disabled={disabled||!valid||!body.trim()||body.trim()===saved||invalidBody||full}><Check size={15}/>Notu kaydet</button></div></footer></form>{confirming&&<div className="episode-note-confirm" role="group" aria-label="Bölüm notunu kaldırmayı onayla"><p>{episode}. bölüm notun kaldırılacak.</p><button type="button" className="feature-link" onClick={()=>setConfirming(false)}>Vazgeç</button><button type="button" className="feature-button" disabled={disabled} onClick={()=>save(true)}>Notu kaldır</button></div>}{notice&&(notes[notice.episode]||'')===notice.body&&<p className="feature-help" role="status">{notice.message}</p>}</div></details>;
+}
+
 export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime; snapshot: Snapshot; onClose: () => void; onChange: Change}) {
   const [details, setDetails] = useState<Details | null>(null);
   const [detailError, setDetailError] = useState('');
@@ -330,8 +418,12 @@ export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime;
         {detailError ? <p className="at-detail-media-note">{detailError} <button className="at-text-button" onClick={()=>retryDetail(value=>value+1)}>Tekrar dene</button></p> : !details && <p className="at-detail-media-note" role="status">Fragman ve bağlantılı seriler yükleniyor…</p>}
       </aside>
       <section className="at-rating-block" aria-labelledby="at-rating-label"><div><h2 id="at-rating-label">Puanın</h2><div className="at-large-score"><strong>{score||'—'}</strong><span>/10</span></div></div><div className="at-rating-stars" aria-hidden="true">{Array.from({length:5},(_,index)=>score>=index*2+2?<Star key={index} size={21} fill='currentColor' className='is-filled'/>:score>=index*2+1?<StarHalf key={index} size={21} fill='currentColor' className='is-filled'/>:<Star key={index} size={21}/>)}</div><label className="at-score-edit"><span className="at-visually-hidden">Puanını seç</span><select disabled={!canEdit} value={score} onChange={event=>{const value=Number(event.target.value);onChange(current=>{const scores={...current.scores};if(value)scores[item.id]=value;else delete scores[item.id];return {...stored(current,item),scores};});}}><option value="0">Puan ver</option>{Array.from({length:10},(_,index)=>10-index).map(value=><option value={value} key={value}>{value} / 10</option>)}</select><ChevronDown size={13}/></label></section>
-      <section className="at-detail-relations feature-series-section" aria-label="Seri bağlantı haritası"><header><h2>Bağlantılı seriler</h2><button type="button" className="feature-button" data-compare-id={item.id}>Karşılaştırmaya ekle</button></header>{relations.length?<><p>Bu animeye doğrudan bağlı sezonlar ve yan hikâyeler. Bir bağlantıya dokunarak MyAnimeList’te inceleyebilirsin.</p><div className="feature-series-map"><div className="feature-series-center"><span>ŞU AN İNCELEDİĞİN</span><strong>{item.title}</strong><small>{item.format}</small></div><ul className="feature-series-branches">{relations.map(relation=><li key={relation.id}><a href={malUrl(relation.url)!} target="_blank" rel="noopener noreferrer"><span>{{Prequel:'Önceki seri',Sequel:'Devam serisi','Side story':'Yan hikâye','Parent story':'Ana seri','Alternative version':'Alternatif sürüm','Alternative setting':'Alternatif evren','Spin-off':'Yan seri',Summary:'Özet',Other:'Diğer bağlantı'}[relation.relation||'' as string]||relation.relation||'Bağlantılı anime'}</span><strong>{relation.title}</strong><ExternalLink size={15}/></a></li>)}</ul></div></>:<div className="feature-series-empty"><p>{details?'Bu anime için kaynakta bağlantılı seri bulunmuyor.':detailError?'Seri haritası şu anda yüklenemedi.':'Seri bağlantıları yükleniyor…'}</p>{detailError&&<button className="feature-button" onClick={()=>retryDetail(v=>v+1)}>Haritayı yeniden dene</button>}</div>}</section>
+      <section className="at-detail-relations feature-series-section" aria-label="Seri bağlantı haritası">
+        <header><div className="series-route-heading"><small><GitBranch size={16} aria-hidden="true"/>SERİ ROTASI</small><h2>Bağlantılı seriler</h2></div><button type="button" className="feature-button" data-compare-id={item.id}>Karşılaştırmaya ekle</button></header>
+        {relations.length ? <SeriesRoute key={item.malId} item={item} relations={relations} snapshot={snapshot}/> : <div className="feature-series-empty"><p>{details ? 'Bu anime için kaynakta bağlantılı seri bulunmuyor.' : detailError ? 'Seri haritası şu anda yüklenemedi.' : 'Seri bağlantıları yükleniyor…'}</p>{detailError && <button className="feature-button" onClick={() => retryDetail(value => value + 1)}>Haritayı yeniden dene</button>}</div>}
+      </section>
     </div>
+    {!snapshot.libraryLoading&&<EpisodeNotes key={item.id+snapshot.accountScope} item={item} library={library} onChange={onChange} disabled={!canEdit} registered={snapshot.account?.registered===true}/>}
     <div className="at-detail-bottom">
       {!snapshot.account?.authenticated && <p className="at-signin-prompt">Listen bu tarayıcıda saklanır. Cihazların arasında eşitlemek ve yorum yazmak için <a href="/giris">giriş yap</a> veya <a href="/uye-ol">üye ol</a>.</p>}
       {snapshot.libraryLoading && <p className="at-muted" role="status">Hesap listen yükleniyor…</p>}
@@ -341,12 +433,18 @@ export function AnimeDetail({ item, snapshot, onClose, onChange }: {item: Anime;
   </article>;
 }
 
+export function reviewNeedsProtection(review:Pick<Review,'episode'|'spoiler'|'userId'>,progress:number,userId?:string) {
+  if(userId&&review.userId===userId)return false;
+  return review.episode!=null?review.episode>Math.max(0,progress||0):review.spoiler;
+}
+
 export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
   const [result, setResult] = useState<ReviewPage | null>(null);
   const [error, setError] = useState('');
   const [version, reload] = useState(0);
   const [body, setBody] = useState('');
   const [spoiler, setSpoiler] = useState(false);
+  const [reviewEpisode,setReviewEpisode]=useState('');
   const [editing, setEditing] = useState<Review | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -367,8 +465,13 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
   const editable = userCanEdit(snapshot);
   const busy = sending || hiding !== null;
   const score = snapshot.library.scores?.[item.id] ?? editing?.score ?? null;
-  const changed = !editing || body.trim() !== editing.body || spoiler !== editing.spoiler || score !== editing.score;
-  const canSubmit = editable && !ownRemoved && !busy && !!item.malId && body.trim().length > 0 && changed;
+  const episode=reviewEpisode===''?null:Number(reviewEpisode);
+  const validEpisode=episode===null||Number.isInteger(episode)&&episode>=1&&episode<=(item.episodes||9999);
+  const effectiveSpoiler=spoiler||episode!==null;
+  const progress=snapshot.library.progress?.[item.id]||0;
+  const revealKey=(review:Review)=>`${review.id}:${review.episode??'general'}:${progress}:${userId||'guest'}:${review.spoiler}`;
+  const changed = (editing?.episode??null)!==episode || !editing || body.trim() !== editing.body || effectiveSpoiler !== editing.spoiler || score !== editing.score;
+  const canSubmit = validEpisode && editable && !ownRemoved && !busy && !!item.malId && body.trim().length > 0 && changed;
   const ownAvatar = avatarUrl(user?.avatarUrl);
   const avatar = (name: string, own: boolean) => <span className="at-mini-avatar at-review-avatar" aria-hidden="true"><span>{initial(name)}</span>{own && ownAvatar && <img src={ownAvatar} alt="" onError={event => {event.currentTarget.hidden = true;}}/>}</span>;
 
@@ -376,7 +479,7 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
   useEffect(() => {
     generation.current++;
     touched.current = false;
-    setBody(''); setSpoiler(false); setEditing(null); setSendError(''); setNotice('');
+    setBody(''); setSpoiler(false); setReviewEpisode(''); setEditing(null); setSendError(''); setNotice('');
     setSending(false); setHiding(null); setConfirming(null); setOwnRemoved(false); setRevealed([]);
     return () => {
       generation.current++;
@@ -396,7 +499,7 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
       const own = value.reviews.find(review => review.userId === userId);
       if (own) {
         setEditing(own);
-        if (!touched.current) { setBody(own.body); setSpoiler(own.spoiler); }
+        if (!touched.current) { setBody(own.body); setSpoiler(own.spoiler);setReviewEpisode(own.episode==null?'':String(own.episode)); }
       }
     }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Yorumlar alınamadı.'); });
     return () => controller.abort();
@@ -408,9 +511,9 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
     const controller = new AbortController(), token = generation.current;
     mutation.current = controller; setSending(true); setSendError(''); setNotice('');
     try {
-      const value = await api<{review: Review}>(`/api/anime/${item.malId}/reviews`, {method: 'POST', signal: controller.signal, body: JSON.stringify({body: body.trim(), spoiler, score})});
+      const value = await api<{review: Review}>(`/api/anime/${item.malId}/reviews`, {method: 'POST', signal: controller.signal, body: JSON.stringify({body: body.trim(), spoiler:effectiveSpoiler, score, episode})});
       if (generation.current !== token || controller.signal.aborted) return;
-      touched.current = false; setEditing(value.review); setBody(value.review.body); setSpoiler(value.review.spoiler);
+      touched.current = false; setEditing(value.review); setBody(value.review.body); setSpoiler(value.review.spoiler);setReviewEpisode(value.review.episode==null?'':String(value.review.episode));
       setNotice('Yorumun kaydedildi.'); setRevealed([]); reload(value => value + 1);
     } catch (reason) {
       if (generation.current === token && !controller.signal.aborted) setSendError(reason instanceof Error ? reason.message : 'Yorum gönderilemedi.');
@@ -421,11 +524,11 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
 
   const beginEdit = (review: Review) => {
     if (busy || !editable || review.userId !== userId) return;
-    touched.current = false; setEditing(review); setBody(review.body); setSpoiler(review.spoiler); setSendError(''); setNotice('');
+    touched.current = false; setEditing(review); setBody(review.body); setSpoiler(review.spoiler);setReviewEpisode(review.episode==null?'':String(review.episode)); setSendError(''); setNotice('');
     textarea.current?.focus({preventScroll: true}); textarea.current?.scrollIntoView({block: 'center'});
   };
   const resetDraft = () => {
-    touched.current = false; setBody(editing?.body || ''); setSpoiler(editing?.spoiler || false); setSendError('');
+    touched.current = false; setBody(editing?.body || ''); setSpoiler(editing?.spoiler || false);setReviewEpisode(editing?.episode==null?'':String(editing.episode)); setSendError('');
   };
   const hide = async (review: Review) => {
     if (mutation.current || !editable || (review.userId !== userId && user?.role !== 'admin')) return;
@@ -435,7 +538,7 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
       await api(`/api/anime/${item.malId}/reviews/${encodeURIComponent(review.id)}`, {method: 'PATCH', signal: controller.signal, body: JSON.stringify({hidden: true})});
       if (generation.current !== token || controller.signal.aborted) return;
       setConfirming(null); setNotice(review.userId === userId ? '' : 'Yorum yayından kaldırıldı.');
-      if (review.userId === userId) { setOwnRemoved(true); setEditing(null); setBody(''); setSpoiler(false); touched.current = false; }
+      if (review.userId === userId) { setOwnRemoved(true); setEditing(null); setBody(''); setSpoiler(false);setReviewEpisode(''); touched.current = false; }
       reload(value => value + 1);
     } catch (reason) {
       if (generation.current === token && !controller.signal.aborted) setSendError(reason instanceof Error ? reason.message : 'Yorum kaldırılamadı.');
@@ -453,7 +556,7 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
       setResult(current => current ? {...value, reviews: [...current.reviews, ...value.reviews.filter(review => !current.reviews.some(existing => existing.id === review.id))]} : value);
       setPage(nextPage);
       const own = value.reviews.find(review => review.userId === userId);
-      if (own) { setEditing(own); if (!touched.current) {setBody(own.body);setSpoiler(own.spoiler);} }
+      if (own) { setEditing(own); if (!touched.current) {setBody(own.body);setSpoiler(own.spoiler);setReviewEpisode(own.episode==null?'':String(own.episode));} }
     } catch (reason) {
       if (generation.current === token && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Diğer yorumlar alınamadı.');
     } finally {
@@ -467,18 +570,19 @@ export function Reviews({item, snapshot}: {item: Anime; snapshot: Snapshot}) {
       <div className="at-review-composer-head">{avatar(user?.displayName || 'Sen', true)}<div><label htmlFor="at-review-body">{editing ? 'Yorumunu düzenle' : 'Senin yorumun'}</label><span>{user?.displayName}{score !== null && <> · <Star size={12}/>{score}/10</>}</span></div><span className="at-review-counter" id="at-review-counter">{body.length.toLocaleString('tr-TR')} / 2.000</span></div>
       <textarea ref={textarea} id="at-review-body" aria-describedby="at-review-hint at-review-counter" value={body} maxLength={2000} minLength={1} required rows={4} disabled={busy} placeholder="Hikâye, karakterler veya atmosfer… Senin düşüncen ne?" onChange={event => {touched.current = true;setBody(event.target.value);setSendError('');setNotice('');}}/>
       <p className="at-review-hint" id="at-review-hint">Her anime için bir yorum paylaşabilirsin; yeniden kaydettiğinde mevcut yorumun güncellenir.</p>
-      <div className="at-review-submit"><label className="at-review-spoiler-check"><input type="checkbox" checked={spoiler} disabled={busy} onChange={event => {touched.current = true;setSpoiler(event.target.checked);setNotice('');}}/><span><strong>Spoiler içeriyor</strong><small>Önemli olayları okumadan önce gizle.</small></span></label><div className="at-review-submit-actions">{editing && changed && <button className="at-text-button" type="button" disabled={busy} onClick={resetDraft}>Vazgeç</button>}<button type="submit" className="at-primary-button" disabled={!canSubmit}>{sending ? 'Kaydediliyor…' : editing ? 'Yorumu güncelle' : 'Yorumu paylaş'}{sending ? <span className="at-review-spinner" aria-hidden="true"/> : <ArrowRight size={16}/>}</button></div></div>
+      <label className="review-episode-field">Yorumun bölümü <span>(isteğe bağlı)</span><input aria-label="Yorumun bölüm numarası" type="number" min="1" max={item.episodes||9999} step="1" value={reviewEpisode} placeholder="Genel yorum" disabled={busy} onChange={event=>{touched.current=true;setReviewEpisode(event.target.value);setNotice('');}}/><small>Bölüm numarası eklersen yorumun, o bölüme henüz ulaşmayan kişilerden gizlenir.</small></label>
+      <div className="at-review-submit"><label className="at-review-spoiler-check"><input type="checkbox" checked={effectiveSpoiler} disabled={busy||episode!==null} onChange={event => {touched.current = true;setSpoiler(event.target.checked);setNotice('');}}/><span><strong>Spoiler içeriyor</strong><small>Önemli olayları okumadan önce gizle.</small></span></label><div className="at-review-submit-actions">{editing && changed && <button className="at-text-button" type="button" disabled={busy} onClick={resetDraft}>Vazgeç</button>}<button type="submit" className="at-primary-button" disabled={!canSubmit}>{sending ? 'Kaydediliyor…' : editing ? 'Yorumu güncelle' : 'Yorumu paylaş'}{sending ? <span className="at-review-spinner" aria-hidden="true"/> : <ArrowRight size={16}/>}</button></div></div>
     </form>}
     {ownRemoved && <p className="at-review-feedback" role="status">Yorumun yayından kaldırıldı. Kaldırılan yorum yeniden yayımlanamaz.</p>}
     {notice && <p className="at-review-feedback is-success" role="status"><Check size={16}/>{notice}</p>}
     {sendError && <p className="at-error at-review-feedback" role="alert">{sendError}</p>}
     {error && <p className="at-error at-review-feedback" role="alert">{error}<button type="button" className="at-text-button" onClick={() => reload(value => value + 1)}>Tekrar dene</button></p>}
     {!result && !error ? <div className="at-review-loading" role="status"><span className="at-review-spinner" aria-hidden="true"/>Yorumlar yükleniyor…</div> : result?.reviews.length === 0 ? <div className="at-review-empty"><MessageCircle size={27}/><strong>İlk düşünceyi sen paylaş.</strong><p>Henüz yorum yok. Bu anime hakkında konuşmayı başlatabilirsin.</p></div> : result && <div className="at-review-list">{result.reviews.map(review => {
-      const own = review.userId === userId, hidden = review.spoiler && !revealed.includes(review.id);
+      const own = review.userId === userId, protectedReview=reviewNeedsProtection(review,progress,userId), key=revealKey(review), hidden=protectedReview&&!revealed.includes(key);
       return <article className="at-review" key={review.id}>
         <header className="at-review-author">{avatar(review.displayName, own)}<div className="at-review-author-copy"><strong>{review.displayName}{own && <span className="at-review-self">Sen</span>}</strong><time dateTime={review.createdAt}>{dateLabel(review.createdAt)}</time></div><div className="at-review-actions">{review.score != null && <span className="at-user-score"><Star size={13}/>{review.score}/10</span>}{editable && own && <button type="button" className="at-icon-button" aria-label="Kendi yorumunu düzenle" title="Yorumunu düzenle" disabled={busy} onClick={() => beginEdit(review)}><Pencil size={16}/></button>}{editable && (own || user?.role === 'admin') && <button type="button" className="at-icon-button" aria-label="Bu yorumu kaldır" title="Yorumu kaldır" aria-expanded={confirming === review.id} disabled={busy} onClick={() => setConfirming(confirming === review.id ? null : review.id)}><Trash2 size={16}/></button>}</div></header>
-        {review.spoiler && <span className="at-review-spoiler-tag"><Shield size={12}/>Spoiler içeriyor</span>}
-        {hidden ? <button type="button" className="at-spoiler-button" onClick={() => setRevealed(current => [...current, review.id])}><Eye size={18}/><span><strong>Spoiler içeren yorum</strong><small>Okumak için dokun.</small></span></button> : <><p className="at-review-body">{review.body}</p>{review.spoiler && <button type="button" className="at-review-rehide" onClick={() => setRevealed(current => current.filter(id => id !== review.id))}><EyeOff size={14}/>Spoileri yeniden gizle</button>}</>}
+        {(review.spoiler||review.episode!=null)&&<span className="at-review-spoiler-tag"><Shield size={12}/>{review.episode!=null?`${review.episode}. bölüm`:'Spoiler içeriyor'}</span>}
+        {hidden ? <button type="button" className="at-spoiler-button" onClick={() => setRevealed(current => [...current, key])}><Eye size={18}/><span><strong>{review.episode!=null?`${review.episode}. bölüm hakkında yorum`:'Spoiler içeren yorum'}</strong><small>{review.episode!=null?`İlerlemen: ${progress} bölüm. Yine de okumak için dokun.`:'Okumak için dokun.'}</small></span></button> : <><p className="at-review-body">{review.body}</p>{protectedReview&&<button type="button" className="at-review-rehide" onClick={() => setRevealed(current => current.filter(id => id !== key))}><EyeOff size={14}/>Spoileri yeniden gizle</button>}</>}
         {editable && !own && <ReportReview animeId={item.malId} reviewId={review.id}/>}
         {confirming === review.id && <div className="at-review-remove-confirm" role="group" aria-label="Yorumu kaldırmayı onayla"><p>Bu yorum yayından kaldırılacak. İşlemi bu ekrandan geri alamazsın.</p><div><button type="button" className="at-text-button" disabled={busy} onClick={() => setConfirming(null)}>Vazgeç</button><button type="button" className="at-review-remove-button" disabled={busy} onClick={() => void hide(review)}>{hiding === review.id ? 'Kaldırılıyor…' : 'Yorumu kaldır'}</button></div></div>}
       </article>;

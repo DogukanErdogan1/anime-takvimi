@@ -411,3 +411,13 @@ test('switching between touch and desktop layout repositions the map without req
   assert.equal(ui.mapSnapshots.at(-1).focusNow,true);
   assert.equal(ui.scheduleRequests.length,requests);
 });
+
+
+test('private episode notes round-trip through native snapshots, undo and account boundaries',async()=>{
+ const ui=setup();await flush();const app=ui.window.animeTakvimi,item=anime(21);
+ const base={saved:[item.id],reminders:[],savedAnime:{[item.id]:item},progress:{[item.id]:2},view:'grid',episodeNotes:{[item.id]:{'1':'Original private note'}}};
+ app.replaceLibrarySnapshot(base,{emit:false});app.replaceLibrarySnapshot({...app.getLibrarySnapshot(),episodeNotes:{[item.id]:{'1':'Original private note','2':'New private thought'}}},{emit:true});
+ assert.equal(app.getLibrarySnapshot().episodeNotes[item.id]['2'],'New private thought');assert.equal(app.getLibrarySnapshot().activity.length,0);
+ assert.equal(app.undoLibraryChange(),true);assert.equal(app.getLibrarySnapshot().episodeNotes[item.id]['2'],undefined);assert.equal(app.getLibrarySnapshot().episodeNotes[item.id]['1'],'Original private note');
+ app.setAccountScope('other-account',{saved:[],reminders:[],savedAnime:{},progress:{},view:'grid'});assert.equal(Object.keys(app.getLibrarySnapshot().episodeNotes).length,0);assert.doesNotMatch(JSON.stringify(app.getLibrarySnapshot()),/Original private note/);
+});

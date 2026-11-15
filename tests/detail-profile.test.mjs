@@ -27,7 +27,7 @@ const profileSource=source
   .replace("from './watch-status-select'", `from './detail-profile-watch-status-test-${process.pid}.mjs'`);
 writeFileSync(compiled, ts.transpileModule(profileSource, {compilerOptions}).outputText);
 after(() => { for(const file of [compiled,modelCompiled,watchStatusCompiled]) try { unlinkSync(file); } catch {} });
-const { AnimeDetail, ProfileView, ProfileInsights, ProfileAnimeCard, ProfileLibraryEditor, ProfileClassicAnimeCard } = await import(pathToFileURL(compiled).href);
+const { AnimeDetail, ProfileView, ProfileInsights, ProfileAnimeCard, ProfileLibraryEditor, ProfileClassicAnimeCard, SeriesRoute, buildSeriesRoute } = await import(pathToFileURL(compiled).href);
 const item = {id:'mal-123',malId:123,title:'Test anime',original:'Test anime',image:'https://cdn.myanimelist.net/images/anime/1/123.jpg',genres:['Aksiyon'],episodes:12,rating:8.5,studio:'Studio',summary:'Hikâye özeti.',malUrl:'https://myanimelist.net/anime/123',format:'TV',members:1,day:null,time:null,broadcastLocal:false,airing:false,status:'Tamamlandı',year:2026};
 const library = () => ({saved:[],reminders:[],progress:{},view:'grid',savedAnime:{},tracking:{},scores:{},favorites:[],collections:[]});
 const snapshot = (patch={}) => ({ready:true,page:'discover',catalog:[item],schedule:[],library:library(),account:null,accountScope:null,loading:false,error:null,libraryLoading:false,blocked:false,...patch});
@@ -265,4 +265,26 @@ test('both profile list designs expose direct editing only for editable librarie
     }
   }
   assert.equal(ProfileLibraryEditor({item,library:library(),canEdit:false,onChange(){throw Error('read only');}}),null);
+});
+
+
+const seriesRelation=(id,relation='Side Story',extra={})=>({id,title:`Related ${id}`,url:`https://myanimelist.net/anime/${id}`,relation,...extra});
+test('series route groups source relationships case-insensitively and excludes self, duplicates and unsafe links',()=>{
+ const route=buildSeriesRoute(item,[seriesRelation(124,'Sequel'),seriesRelation(200,'Side Story'),seriesRelation(122,'PREQUEL'),seriesRelation(121,'Parent Story'),seriesRelation(124,'Other'),seriesRelation(item.malId),seriesRelation(201,'Other',{url:'https://evil.example/anime/201'}),seriesRelation(202,'Other',{url:'https://myanimelist.net/anime/999'}),seriesRelation(203,'Spin-off'),seriesRelation(-1)]);
+ assert.deepEqual(route.before.map(r=>r.id),[122,121]);assert.deepEqual(route.after.map(r=>r.id),[124]);assert.deepEqual(route.branches.map(r=>r.id),[200,203]);assert.equal(route.total,5);
+ assert.equal(buildSeriesRoute(item,Array.from({length:35},(_,i)=>seriesRelation(1000+i))).total,20);
+});
+
+test('series route preview keeps main connections and three branches, using real poster endpoints without invented metadata',()=>{
+ const relations=[seriesRelation(122,'Prequel'),seriesRelation(124,'Sequel'),...Array.from({length:8},(_,i)=>seriesRelation(200+i))];
+ const html=renderToStaticMarkup(React.createElement(SeriesRoute,{item,relations,snapshot:snapshot()}));
+ assert.match(html,/series-route-layout has-branches/);assert.match(html,/aria-label="Önceki ve devam serileri"/);assert.match(html,/Önceki seri/);assert.match(html,/Devam serisi/);assert.match(html,/Yan hikâye/);assert.match(html,/Şu an inceliyorsun/);
+ for(const id of [122,124,200,201,202])assert.match(html,new RegExp(`src="/api/posters/${id}"`));
+ assert.doesNotMatch(html,/Related 203|Related 204/);assert.match(html,/aria-expanded="false"/);assert.match(html,/Tüm bağlantılar/);assert.match(html,/5 \/ 10 bağlantı gösteriliyor/);
+ assert.equal((html.match(/class="series-route-copy"/g)||[]).length,6);assert.equal((html.match(/12 bölüm/g)||[]).length,1,'only the current anime has known episode metadata');
+});
+
+test('a single main-series connection needs no side branch or expansion control',()=>{
+ const html=renderToStaticMarkup(React.createElement(SeriesRoute,{item,relations:[seriesRelation(124,'Sequel')],snapshot:snapshot()}));
+ assert.doesNotMatch(html,/has-branches|series-route-side|Tüm bağlantılar/);assert.match(html,/1 bağlantı/);assert.match(html,/Related 124/);
 });

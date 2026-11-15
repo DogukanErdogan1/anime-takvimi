@@ -16,7 +16,7 @@ export type Library = {
   view: 'grid' | 'list'; savedAnime: Record<string, Anime>;
   tracking: Record<string, WatchStatus>; scores: Record<string, number>;
   favorites: string[]; collections: Collection[];
-  activity?:Activity[]; homeLayout?:HomeLayout;
+  activity?:Activity[]; homeLayout?:HomeLayout; episodeNotes?:Record<string,Record<string,string>>;
 };
 export type Account = {
   authenticated: boolean; registered: boolean;

@@ -76,7 +76,7 @@ export const memberProfiles = sqliteTable('member_profiles', {
 export const animeReviews = sqliteTable('anime_reviews', {
   id:text('id').primaryKey(), animeId:integer('anime_id').notNull(),
   userId:text('user_id').notNull().references(()=>members.id), body:text('body').notNull(),
-  spoiler:integer('spoiler').notNull().default(0), score:integer('score'),
+  spoiler:integer('spoiler').notNull().default(0), score:integer('score'), episode:integer('episode'),
   createdAt:text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt:text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   hidden:integer('hidden').notNull().default(0),
@@ -85,6 +85,7 @@ export const animeReviews = sqliteTable('anime_reviews', {
   check('review_anime_check',sql`${table.animeId} BETWEEN 1 AND 9999999999`),
   check('review_body_check',sql`length(trim(${table.body})) BETWEEN 1 AND 2000`),
   check('review_spoiler_check',sql`${table.spoiler} IN (0,1)`),
+  check('review_episode_check',sql`${table.episode} IS NULL OR (typeof(${table.episode})='integer' AND ${table.episode} BETWEEN 1 AND 9999 AND ${table.spoiler}=1)`),
   check('review_score_check',sql`${table.score} IS NULL OR ${table.score} BETWEEN 1 AND 10`),
   check('review_hidden_check',sql`${table.hidden} IN (0,1)`),
   uniqueIndex('review_author_anime_idx').on(table.animeId,table.userId),

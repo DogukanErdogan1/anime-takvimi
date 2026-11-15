@@ -19,7 +19,7 @@ export function unmount(){for(const entry of effects.values())entry.cleanup?.();
 export function lateUpdates(){return late;}`);
 const source=readFileSync(new URL('../components/experience/detail-profile.tsx',import.meta.url),'utf8');
 const ast=ts.createSourceFile('detail-profile.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-const names=new Set(['Reviews','api','avatarUrl','initial','dateLabel','userCanEdit']);
+const names=new Set(['Reviews','api','avatarUrl','initial','dateLabel','userCanEdit','reviewNeedsProtection']);
 const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&names.has(node.name?.text)).map(node=>node.getText(ast));
 assert.equal(functions.length,names.size,'exercise the actual production functions');
 const icons=ast.statements.find(node=>ts.isImportDeclaration(node)&&node.moduleSpecifier.text==='lucide-react').getText(ast);
@@ -54,7 +54,7 @@ function setup(t,{fetcher=async()=>response(page([])),guest=false}={}){
 test('existing review enters explicit editing with its text, spoiler and original score',async t=>{
  const own=review({spoiler:true});const ui=setup(t,{fetcher:async()=>response(page([own]))});await ui.loaded();
  const field=find(ui.render(),node=>node.type==='textarea');assert.equal(field.props.value,own.body);
- assert.equal(find(ui.render(),node=>node.type==='input').props.checked,true);
+ assert.equal(find(ui.render(),node=>node.type==='input'&&node.props.type==='checkbox').props.checked,true);
  assert.equal(ui.button('Yorumu güncelle').props.disabled,true);
  assert.match(text(ui.render()),/Yorumunu düzenle/);assert.match(text(ui.render()),/2\.000/);
  assert.ok(find(ui.render(),node=>node.type==='img'&&node.props.src.startsWith('/api/account/avatar')));
@@ -74,7 +74,7 @@ test('saving an edit preserves score and spoiler, and a fast second submit makes
  ui.type('Güncellenmiş yorum');const form=find(ui.render(),node=>node.type==='form');
  const first=form.props.onSubmit({preventDefault(){}}),second=form.props.onSubmit({preventDefault(){}});
  assert.equal(ui.requests.filter(request=>request.method==='POST').length,1);
- const posted=ui.requests.find(request=>request.method==='POST');assert.deepEqual(posted.payload,{body:'Güncellenmiş yorum',spoiler:true,score:8});assert.equal(posted.credentials,'same-origin');
+ const posted=ui.requests.find(request=>request.method==='POST');assert.deepEqual(posted.payload,{body:'Güncellenmiş yorum',spoiler:true,score:8,episode:null});assert.equal(posted.credentials,'same-origin');
  complete(response({review:{...own,body:'Güncellenmiş yorum'}}));await Promise.all([first,second]);
  assert.match(text(ui.render()),/Yorumun kaydedildi/);
 });
@@ -83,7 +83,7 @@ test('failed submissions retain the draft and spoiler selection for retry',async
  const ui=setup(t,{fetcher:async request=>request.method==='POST'?response({error:{message:'Kaydedilemedi'}},503):response(page([]))});await ui.loaded();
  ui.type('Taslak metni');ui.spoiler(true);await ui.submit();
  assert.equal(find(ui.render(),node=>node.type==='textarea').props.value,'Taslak metni');
- assert.equal(find(ui.render(),node=>node.type==='input').props.checked,true);
+ assert.equal(find(ui.render(),node=>node.type==='input'&&node.props.type==='checkbox').props.checked,true);
  assert.match(text(ui.render()),/Kaydedilemedi/);assert.equal(ui.button('Yorumu paylaş').props.disabled,false);
 });
 
@@ -137,4 +137,28 @@ test('an unmounted composer ignores a pending save completion',async t=>{
  let done;const ui=setup(t,{fetcher:async request=>request.method==='POST'?new Promise(resolve=>{done=resolve;}):response(page([]))});await ui.loaded();
  ui.type('Yorum metni');const saving=ui.submit();ui.unmount();done(response({review:review({body:'Yorum metni'})}));await saving;
  assert.equal(hooks.lateUpdates(),0);
+});
+
+
+test('a numbered review is protected until the viewer reaches it and stale reveals cannot survive progress changes',async t=>{
+ const future=review({userId:'other',body:'Seventh episode secret',spoiler:true,episode:7});
+ const ui=setup(t,{fetcher:async()=>response(page([future]))});ui.props.snapshot.library.progress={'mal-1':6};await ui.loaded();
+ assert.doesNotMatch(text(ui.render()),/Seventh episode secret/);assert.match(text(ui.render()),/7. bölüm hakkında yorum/);
+ find(ui.render(),node=>node.props?.className==='at-spoiler-button').props.onClick();assert.match(text(ui.render()),/Seventh episode secret/);
+ ui.props.snapshot.library.progress['mal-1']=5;assert.doesNotMatch(text(ui.render()),/Seventh episode secret/);
+ ui.props.snapshot.library.progress['mal-1']=7;assert.match(text(ui.render()),/Seventh episode secret/);
+ ui.props.snapshot.library.progress['mal-1']=4;assert.doesNotMatch(text(ui.render()),/Seventh episode secret/);
+});
+
+test('episode assignment forces spoiler protection and validates the anime episode limit',async t=>{
+ const ui=setup(t,{fetcher:async request=>request.method==='POST'?response({review:review({body:'Bölüm düşüncem',episode:7,spoiler:true})}):response(page([]))});
+ ui.props.item.episodes=12;await ui.loaded();ui.type('Bölüm düşüncem');
+ const episode=()=>find(ui.render(),node=>node.props?.['aria-label']==='Yorumun bölüm numarası');
+ episode().props.onChange({target:{value:'13'}});assert.equal(ui.button('Yorumu paylaş').props.disabled,true);
+ episode().props.onChange({target:{value:'7'}});const checkbox=find(ui.render(),node=>node.type==='input'&&node.props.type==='checkbox');assert.equal(checkbox.props.checked,true);assert.equal(checkbox.props.disabled,true);
+ await ui.submit();assert.deepEqual(ui.requests.find(request=>request.method==='POST').payload,{body:'Bölüm düşüncem',spoiler:true,score:null,episode:7});
+});
+
+test('generic spoilers remain hidden even after high progress while the author can read their own review',async t=>{
+ const other=review({userId:'other',body:'General spoiler',spoiler:true});const ui=setup(t,{fetcher:async()=>response(page([other]))});ui.props.snapshot.library.progress={'mal-1':9999};await ui.loaded();assert.doesNotMatch(text(ui.render()),/General spoiler/);
 });

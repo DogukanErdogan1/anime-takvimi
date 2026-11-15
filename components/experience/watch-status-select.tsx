@@ -11,14 +11,14 @@ const options=[
   {value:'dropped',label:'Bıraktım',description:'İzlemeyi bıraktım',Icon:Square},
 ] as const;
 
-export function WatchStatusSelect({value,onChange,disabled=false,label='İzleme durumu',compact=false}:{
-  value:WatchStatus|'';onChange:(value:WatchStatus)=>void;disabled?:boolean;label?:string;compact?:boolean;
+export function WatchStatusSelect({value,onChange,disabled=false,label='İzleme durumu',compact=false,placeholder='Listene ekle'}:{
+  value:WatchStatus|'';onChange:(value:WatchStatus)=>void;disabled?:boolean;label?:string;compact?:boolean;placeholder?:string;
 }){
   const selected=options.find(option=>option.value===value),Icon=selected?.Icon||ListPlus;
   return <Select.Root value={value} disabled={disabled} onValueChange={next=>{if(options.some(option=>option.value===next))onChange(next as WatchStatus);}}>
     <Select.Trigger className={'at-watch-status-trigger'+(compact?' is-compact':'')} aria-label={label} data-watch-status={value||'empty'}>
       <span className="at-watch-status-symbol" aria-hidden="true"><Icon size={15}/></span>
-      <Select.Value placeholder="Listene ekle">{selected?.label}</Select.Value>
+      <Select.Value placeholder={placeholder}>{selected?.label}</Select.Value>
       <Select.Icon className="at-watch-status-chevron"><ChevronDown size={14}/></Select.Icon>
     </Select.Trigger>
     <Select.Portal>

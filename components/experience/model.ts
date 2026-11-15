@@ -44,3 +44,16 @@ export function advanceEpisode(item:Anime, library:Library):Partial<Library> {
     progress:{...library.progress,[item.id]:next},
     tracking:{...library.tracking,[item.id]:item.episodes&&next>=item.episodes?'completed':'watching'}};
 }
+
+export function bulkLibraryPatch(library:Library, selection:string[], action:{status?:WatchStatus;favorite?:boolean;collectionId?:string}):Partial<Library> {
+  const ids=[...new Set(selection)].filter(id=>library.saved.includes(id)&&library.savedAnime[id]);
+  if(!ids.length)return {};
+  if(action.status&&statuses.some(status=>status.id===action.status)){
+    const tracking={...library.tracking},progress={...library.progress};
+    for(const id of ids){tracking[id]=action.status;const total=library.savedAnime[id].episodes;if(action.status==='completed'&&total&&total>0)progress[id]=total;}
+    return {tracking,progress};
+  }
+  if(typeof action.favorite==='boolean')return {favorites:action.favorite?[...new Set([...library.favorites,...ids])]:library.favorites.filter(id=>!ids.includes(id))};
+  if(action.collectionId&&library.collections.some(collection=>collection.id===action.collectionId))return {collections:library.collections.map(collection=>collection.id===action.collectionId?{...collection,animeIds:[...new Set([...collection.animeIds,...ids])]}:collection)};
+  return {};
+}

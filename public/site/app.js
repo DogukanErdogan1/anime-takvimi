@@ -18,7 +18,7 @@
   const state = {
     page: 'discover', format: 'TV', genre: 'all', sort: 'popular', query: '',
     view: 'grid', limit: 5, hero: 0, quarter: 3, year: 2026, libraryYear: 2026, seasonsOpen: false,
-    saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], activity:[],homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0},dialogId: null,
+    saved: new Set(), reminders: new Set(), progress: {}, tracking: {}, scores: {}, favorites: [], collections: [], episodeNotes:{}, activity:[],homeLayout:{order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0},dialogId: null,
     advanced:{genres:[],mode:'all',minRating:0,minEpisodes:0,maxEpisodes:0,studio:'',status:'all'},
     catalog: [], catalogKey: null, catalogMeta: null, catalogLoading: false, catalogError: null, catalogProgress: '',
     schedule: [], scheduleMeta: null, scheduleLoading: false, scheduleError: null,
@@ -131,7 +131,7 @@
   function installLibrary(stored) {
       state.saved = new Set(); state.reminders = new Set(); state.progress = {}; state.view = 'grid';
       state.tracking = {}; state.scores = {}; state.favorites = []; state.collections = [];
-      state.activity=[];state.homeLayout={order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0};
+      state.episodeNotes={};state.activity=[];state.homeLayout={order:['continue','recommendations','today','history'],hidden:[],weeklyGoal:0};
       if (!stored || typeof stored !== 'object') return;
       const validId = id => typeof id === 'string' && /^mal-[1-9]\d*$/.test(id);
       if (Array.isArray(stored.saved)) state.saved = new Set(stored.saved.filter(validId));
@@ -154,6 +154,14 @@
       });
       if (['grid', 'list'].includes(stored.view)) state.view = stored.view;
       if(Array.isArray(stored.activity))state.activity=stored.activity.filter(e=>e&&typeof e.id==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(e.id)&&validId(e.animeId)&&typeof e.title==='string'&&Number.isSafeInteger(e.at)&&e.at>=0&&[e.from,e.to].every(n=>Number.isInteger(n)&&n>=0&&n<=9999)&&e.from!==e.to).slice(0,500).map(e=>({id:e.id,animeId:e.animeId,title:e.title.replace(/[\x00-\x1f]/g,'').slice(0,500),at:e.at,from:e.from,to:e.to}));
+      if(stored.episodeNotes&&typeof stored.episodeNotes==='object'&&!Array.isArray(stored.episodeNotes)){
+        let noteCount=0;
+        for(const [animeId,notes] of Object.entries(stored.episodeNotes)){
+          if(!validId(animeId)||!notes||typeof notes!=='object'||Array.isArray(notes))continue;
+          const clean={};for(const [episode,body] of Object.entries(notes)){if(noteCount>=250)break;if(/^[1-9]\d{0,3}$/.test(episode)&&Number(episode)<=9999&&typeof body==='string'&&body.trim()&&body.length<=2000&&!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(body)){clean[episode]=body.trim();noteCount++;}}
+          if(Object.keys(clean).length)state.episodeNotes[animeId]=clean;
+        }
+      }
       if(stored.homeLayout){const ids=['continue','recommendations','today','history'],order=Array.isArray(stored.homeLayout.order)?[...new Set(stored.homeLayout.order.filter(id=>ids.includes(id)))]:[];state.homeLayout={order:[...order,...ids.filter(id=>!order.includes(id))],hidden:Array.isArray(stored.homeLayout.hidden)?[...new Set(stored.homeLayout.hidden.filter(id=>ids.includes(id)))]:[],weeklyGoal:Number.isInteger(stored.homeLayout.weeklyGoal)?Math.max(0,Math.min(300,stored.homeLayout.weeklyGoal)):0};}
   }
 
@@ -165,10 +173,10 @@
 
   function getLibrarySnapshot() {
     const savedAnime = {};
-    new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress), ...state.favorites, ...Object.keys(state.tracking), ...Object.keys(state.scores), ...state.collections.flatMap(list => list.animeIds)]).forEach(id => {
+    new Set([...state.saved, ...state.reminders, ...Object.keys(state.progress), ...state.favorites, ...Object.keys(state.tracking), ...Object.keys(state.scores), ...Object.keys(state.episodeNotes), ...state.collections.flatMap(list => list.animeIds)]).forEach(id => {
       if (byId.has(id)) savedAnime[id] = byId.get(id);
     });
-    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime, tracking:state.tracking, scores:state.scores, favorites:state.favorites, collections:state.collections,activity:state.activity,homeLayout:state.homeLayout }));
+    return JSON.parse(JSON.stringify({ saved: [...state.saved], reminders: [...state.reminders], progress: state.progress, view: state.view, savedAnime, tracking:state.tracking, scores:state.scores, favorites:state.favorites, collections:state.collections,episodeNotes:state.episodeNotes,activity:state.activity,homeLayout:state.homeLayout }));
   }
 
   function persist(emit = true,{recordActivity=true,undo=true,preserveUndo=false}={}) {

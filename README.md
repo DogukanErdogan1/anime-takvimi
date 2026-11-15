@@ -115,3 +115,11 @@ Yerelde npm run dev / Siteyi-Ac.cmd aynı görevi başlatır. Anahtarlar Git dı
 
 Bildirim alabilmek için HTTPS (yerelde localhost), desteklenen tarayıcı, cihazda internet bağlantısı ve geçerli oturum gerekir. iPhone/iPad'de siteyi ana ekrana ekleyerek kullan. Tarayıcı tamamen kapatıldığında veya işletim sistemi arka plan çalışmasını engellediğinde teslimat gecikebilir. Bu özellik e-posta göndermez.
 
+
+
+## Toplu düzenleme, bölüm notları ve spoiler koruması
+
+- **Listem → Toplu düzenle** ile görünen animeleri seçebilir, durumlarını ve favorilerini birlikte değiştirebilir veya mevcut bir koleksiyona ekleyebilirsin. Filtre değişince seçim temizlenir. Tek işlemde kaydedilen değişikliklerin tamamı mevcut **Geri al** düğmesiyle geri alınabilir. Tamamlandı seçimi yalnız bölüm toplamı bilinen animelerde ilerlemeyi doldurur.
+- Anime detayındaki **Bölüm notlarım** yalnız kullanıcıya aittir. Hesapla girişte özel liste JSON'unda, misafirde tarayıcıda saklanır. En fazla 250 not, her not için 2.000 karakter desteklenir. Notlar herkese açık profil yanıtına veya normal JSON/CSV liste dışa aktarımına eklenmez. Eski istemcilerin liste kayıtları yeni not alanını silmez.
+- Yorum yazarken isteğe bağlı bölüm numarası verilebilir. Bölüm numarası spoiler işaretini zorunlu kılar. Görüntüleyen kişinin ilerlemesinden sonraki yorumların gövdesi açılana kadar arayüzde oluşturulmaz; ilgili bölüme ulaşıldığında otomatik görünür. Bölüm numarası olmayan eski spoiler yorumları elle açılmaya devam eder. Kişi kendi yorumunu görebilir. İlerleme veya hesap değiştiğinde önceki elle açma tercihi taşınmaz.
+- Yorum alanı için **0009_review_episodes.sql** migration'ını uygula. Önceki yorumlar `episode=NULL` olarak korunur. Railway açılışta migration'ı otomatik uygular; yerel D1 için mevcut `db:migrate` komutu kullanılabilir.

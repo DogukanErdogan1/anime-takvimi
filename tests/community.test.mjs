@@ -232,3 +232,25 @@ test('administrator removal hides the reported review and closes its reports',as
  await moderation.resolve(owner,report.id,{action:'remove'});
  assert.equal((await service.getReviews(1)).total,0);assert.equal((await moderation.list(owner)).reports.length,0);
 });
+
+
+test('episode review metadata survives older clients, enforces bounds and does not change legacy reviews',async t=>{
+ const {service,db}=await fixture(t);
+ const old=(await service.postReview(alice,1,{body:'Legacy comment'})).review;assert.equal('episode' in old,false);
+ const numbered=(await service.postReview(alice,1,{body:'Episode seven',episode:7,spoiler:false})).review;assert.equal(numbered.episode,7);assert.equal(numbered.spoiler,true);assert.equal(numbered.id,old.id);
+ const preserved=(await service.postReview(alice,1,{body:'Old client edit',spoiler:false})).review;assert.equal(preserved.episode,7);assert.equal(preserved.spoiler,true);
+ assert.equal((await service.getReviews(1)).reviews[0].episode,7);
+ const cleared=(await service.postReview(alice,1,{body:'General review',episode:null,spoiler:false})).review;assert.equal(cleared.spoiler,false);assert.equal('episode' in cleared,false);
+ for(const episode of [0,-1,1.5,10000,'7',{},true])await status(()=>service.postReview(alice,1,{body:'Invalid',episode}),400);
+ assert.throws(()=>db.sqlite.prepare('UPDATE anime_reviews SET episode=2,spoiler=0 WHERE id=?').run(old.id));
+});
+
+test('episode notes stay private, are scoped by account and survive writes from older clients',async t=>{
+ const {service,membership}=await fixture(t);
+ const episodeNotes={'mal-2':{'3':'Only Alice may read this note'}};
+ await membership.putLibrary(alice,{library:{...library(),savedAnime:{...library().savedAnime,'mal-2':{id:'mal-2',title:'Private note-only anime'}},episodeNotes}});
+ await membership.putLibrary(alice,{library:library()});assert.deepEqual((await membership.getLibrary(alice)).library.episodeNotes,episodeNotes);
+ assert.equal((await membership.getLibrary(bob)).library.episodeNotes,undefined);
+ await service.putProfile(alice,{bio:'',isPublic:true});const publicValue=await service.getPublicProfile('alice');assert.equal(publicValue.library.episodeNotes,undefined);assert.doesNotMatch(JSON.stringify(publicValue),/Only Alice|Private note-only anime/);
+ await membership.putLibrary(alice,{library:{...library(),episodeNotes:{}}});assert.deepEqual((await membership.getLibrary(alice)).library.episodeNotes,{});
+});
